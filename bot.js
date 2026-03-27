@@ -79,6 +79,7 @@ function initBot(token, webAppUrl) {
       `Пополнение ${amount} ⭐`,
       `Покупка ${amount} звёзд для игры`,
       `stars_${amount}_${Date.now()}`,
+      '',
       'XTR',
       [{ label: `${amount} Stars`, amount }]
     );
