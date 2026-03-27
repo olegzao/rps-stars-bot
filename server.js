@@ -1,4 +1,7 @@
-require('dotenv').config();
+try { require('dotenv').config(); } catch {}
+console.log('BOT_TOKEN present:', !!process.env.BOT_TOKEN);
+console.log('WEBAPP_URL:', process.env.WEBAPP_URL);
+console.log('PORT:', process.env.PORT);
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
