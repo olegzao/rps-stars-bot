@@ -76,27 +76,6 @@ function startRound(room) {
   const ids = getPlayerIds(room);
   if (ids.length < 2) return;
 
-  for (const pid of ids) {
-    const bal = getBalance(pid);
-    if (bal < STAKE) {
-      const player = room.players[pid];
-      if (player.socket) {
-        player.socket.emit('no_stars', { balance: bal });
-      }
-      const oppId = getOpponentId(room, pid);
-      if (oppId && room.players[oppId]?.socket) {
-        room.players[oppId].socket.emit('opponent_no_stars');
-      }
-      return;
-    }
-  }
-
-  const success = deductStars(ids[0], ids[1], STAKE);
-  if (!success) {
-    broadcastToRoom(room, 'error', { message: 'Недостаточно звёзд' });
-    return;
-  }
-
   room.round++;
   for (const p of Object.values(room.players)) {
     p.choice = null;
@@ -136,35 +115,29 @@ function resolveRound(room) {
   let result;
 
   if (!c1 && !c2) {
-    handleDraw(p1Id, p2Id, STAKE);
     result = 'draw';
   } else if (!c1) {
     winnerId = p2Id;
     loserId = p1Id;
-    awardWinner(p2Id, p1Id, STAKE * 2);
     p2.score++;
     result = 'timeout';
   } else if (!c2) {
     winnerId = p1Id;
     loserId = p2Id;
-    awardWinner(p1Id, p2Id, STAKE * 2);
     p1.score++;
     result = 'timeout';
   } else {
     const outcome = determineWinner(c1, c2);
     if (outcome === 'draw') {
-      handleDraw(p1Id, p2Id, STAKE);
       result = 'draw';
     } else if (outcome === 'p1') {
       winnerId = p1Id;
       loserId = p2Id;
-      awardWinner(p1Id, p2Id, STAKE * 2);
       p1.score++;
       result = 'win';
     } else {
       winnerId = p2Id;
       loserId = p1Id;
-      awardWinner(p2Id, p1Id, STAKE * 2);
       p2.score++;
       result = 'win';
     }
