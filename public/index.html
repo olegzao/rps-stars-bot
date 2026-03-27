@@ -73,10 +73,6 @@
 
   <!-- Header -->
   <div class="header">
-    <div class="balance" id="headerBalance">
-      <svg class="star-icon"><use href="#icon-star"/></svg>
-      <span>0</span>
-    </div>
     <div class="score-display" id="headerScore"></div>
     <button class="btn-exit" id="btnExit" style="display:none" onclick="endGame()">Выход</button>
   </div>
@@ -88,17 +84,9 @@
     </div>
     <div class="lobby-title">RPS Battle</div>
     <div class="lobby-subtitle">Камень Ножницы Бумага — онлайн</div>
-    <div class="lobby-balance" id="lobbyBalance">
-      <svg style="width:18px;height:18px"><use href="#icon-star"/></svg>
-      <span>0</span>
-    </div>
     <button class="btn btn-primary" onclick="createRoom()">
       <svg style="width:20px;height:20px"><use href="#icon-gamepad"/></svg>
       Создать комнату
-    </button>
-    <button class="btn btn-accent" onclick="showDeposit()">
-      <svg style="width:20px;height:20px"><use href="#icon-bolt"/></svg>
-      Пополнить баланс
     </button>
     <button class="btn btn-secondary" onclick="showProfile()">
       <svg style="width:20px;height:20px;stroke:#fff;fill:none"><use href="#icon-user"/></svg>
@@ -142,6 +130,12 @@
       </div>
       <div class="result-text" id="resultText" style="display:none"></div>
 
+      <!-- Ready phase -->
+      <div class="ready-area" id="readyArea" style="display:none">
+        <button class="btn btn-green ready-btn" id="btnReady" onclick="playerReady()">ГОТОВ</button>
+        <div class="ready-status" id="readyStatus">Ожидание готовности...</div>
+      </div>
+
       <div class="choices" id="choicesArea">
         <button class="choice-btn" data-choice="rock" onclick="makeChoice('rock')">
           <svg class="choice-icon"><use href="#icon-rock"/></svg>
@@ -174,38 +168,13 @@
     <button class="btn btn-secondary" onclick="backToLobby()">Выйти</button>
   </div>
 
-  <!-- Deposit -->
-  <div class="screen" id="screenDeposit">
-    <div class="deposit-title">Пополнить баланс</div>
-    <div class="deposit-sub">Выбери количество звёзд</div>
-    <div class="deposit-options">
-      <button class="btn btn-accent" onclick="deposit(1)">
-        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 1 звезда
-      </button>
-      <button class="btn btn-accent" onclick="deposit(5)">
-        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 5 звёзд
-      </button>
-      <button class="btn btn-accent" onclick="deposit(10)">
-        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 10 звёзд
-      </button>
-      <button class="btn btn-accent" onclick="deposit(25)">
-        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 25 звёзд
-      </button>
-    </div>
-    <button class="btn btn-secondary" style="margin-top:16px;max-width:280px" onclick="backToLobby()">Назад</button>
-  </div>
-
   <!-- Profile -->
   <div class="screen" id="screenProfile">
     <div class="profile-avatar">
       <svg style="stroke:#fff;fill:none"><use href="#icon-user"/></svg>
     </div>
-    <div class="deposit-title" style="margin-bottom:16px">Профиль</div>
+    <div class="deposit-title" style="margin-bottom:16px">Статистика</div>
     <div class="profile-card">
-      <div class="profile-stat">
-        <span class="profile-stat-label">Баланс</span>
-        <span class="profile-stat-value gold" id="profBalance">0 ⭐</span>
-      </div>
       <div class="profile-stat">
         <span class="profile-stat-label">Победы</span>
         <span class="profile-stat-value green" id="profWins">0</span>
@@ -219,18 +188,7 @@
         <span class="profile-stat-value" id="profDraws">0</span>
       </div>
     </div>
-    <button class="btn btn-accent" onclick="requestRefund()">Вывести звёзды</button>
     <button class="btn btn-secondary" style="max-width:280px" onclick="backToLobby()">Назад</button>
-  </div>
-
-  <!-- No Stars Overlay -->
-  <div class="no-stars-overlay" id="noStarsOverlay">
-    <div class="no-stars-icon">
-      <svg><use href="#icon-bolt"/></svg>
-    </div>
-    <div class="no-stars-text">Звёзды закончились!</div>
-    <button class="btn btn-accent" onclick="depositFromGame(10)">Пополнить 10 ⭐</button>
-    <button class="btn btn-accent" onclick="depositFromGame(25)">Пополнить 25 ⭐</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

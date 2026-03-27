@@ -9,14 +9,13 @@ if (tg) {
 const socket = io();
 
 let myId = null;
-let myBalance = 0;
 let myScore = 0;
 let oppScore = 0;
 let currentRoomId = null;
 let timerInterval = null;
 let roundLogs = [];
-let startBalance = 0;
 let opponentInfo = null;
+let isReady = false;
 
 const CHOICE_SVG = {
   rock: '<svg style="width:36px;height:36px"><use href="#icon-rock"/></svg>',
@@ -32,18 +31,11 @@ const CHOICE_MINI = {
   timeout: '<svg style="width:18px;height:18px"><use href="#icon-timeout"/></svg>',
 };
 
-// --- DOM ---
 const $ = (id) => document.getElementById(id);
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
   $(id).classList.add('active');
-}
-
-function updateBalanceUI(bal) {
-  myBalance = bal;
-  $('headerBalance').querySelector('span').textContent = bal;
-  $('lobbyBalance').querySelector('span').textContent = bal;
 }
 
 function updateScoreUI() {
@@ -59,9 +51,6 @@ socket.emit('auth', { initData });
 
 socket.on('auth_ok', (data) => {
   myId = data.user.telegram_id;
-  updateBalanceUI(data.user.balance);
-  startBalance = data.user.balance;
-
   if (roomFromUrl) {
     joinRoom(roomFromUrl);
   }
@@ -115,26 +104,70 @@ socket.on('game_ready', (data) => {
   showScreen('screenGame');
 });
 
+// --- Ready phase ---
+socket.on('ready_check', () => {
+  showReadyPhase();
+});
+
+socket.on('ready_update', (data) => {
+  const iAmReady = data.readyPlayers.includes(myId);
+  const oppReady = data.readyPlayers.length > (iAmReady ? 1 : 0);
+
+  const btn = $('btnReady');
+  if (iAmReady) {
+    btn.disabled = true;
+    btn.textContent = 'ГОТОВ ✓';
+  }
+
+  let statusText = '';
+  if (data.readyPlayers.length === 0) {
+    statusText = 'Нажмите "Готов" чтобы начать';
+  } else if (data.readyPlayers.length === 1) {
+    statusText = iAmReady ? 'Ждём соперника...' : 'Соперник готов!';
+  }
+  $('readyStatus').innerHTML = statusText +
+    '<div class="ready-dots">' +
+    `<span class="ready-dot ${iAmReady ? 'active' : ''}"></span>` +
+    `<span class="ready-dot ${oppReady ? 'active' : ''}"></span>` +
+    '</div>';
+});
+
+function showReadyPhase() {
+  isReady = false;
+  $('readyArea').style.display = 'flex';
+  $('choicesArea').style.display = 'none';
+  $('timer').style.display = 'none';
+  $('timerRing').style.animation = 'none';
+  const btn = $('btnReady');
+  btn.disabled = false;
+  btn.textContent = 'ГОТОВ';
+  $('readyStatus').innerHTML = 'Нажмите "Готов" чтобы начать' +
+    '<div class="ready-dots"><span class="ready-dot"></span><span class="ready-dot"></span></div>';
+}
+
+function playerReady() {
+  if (isReady) return;
+  isReady = true;
+  socket.emit('player_ready');
+  $('btnReady').disabled = true;
+  $('btnReady').textContent = 'ГОТОВ ✓';
+}
+
 // --- Game ---
 socket.on('round_start', (data) => {
   showScreen('screenGame');
-  $('noStarsOverlay').classList.remove('active');
+  $('readyArea').style.display = 'none';
   $('revealArea').style.display = 'none';
   $('resultText').style.display = 'none';
   $('choicesArea').style.display = 'flex';
   $('roundInfo').textContent = `РАУНД ${data.round}`;
   $('statusText').textContent = 'Выбирай!';
 
-  if (data.balances && data.balances[myId] !== undefined) {
-    updateBalanceUI(data.balances[myId]);
-  }
-
   document.querySelectorAll('.choice-btn').forEach((b) => {
     b.classList.remove('selected');
     b.disabled = false;
   });
 
-  // Reset timer ring animation
   const ring = $('timerRing');
   ring.style.animation = 'none';
   void ring.offsetWidth;
@@ -198,7 +231,6 @@ socket.on('round_result', (data) => {
   myCard.className = 'reveal-card' + (iWon ? ' winner' : (!isDraw ? ' loser' : ''));
   oppCard.className = 'reveal-card' + (!iWon && !isDraw ? ' winner' : (isDraw ? '' : ' loser'));
 
-  // Re-trigger animation
   [myCard, oppCard].forEach(c => {
     c.style.animation = 'none';
     void c.offsetWidth;
@@ -223,14 +255,13 @@ socket.on('round_result', (data) => {
     updateScoreUI();
   }
 
-  if (data.balances && data.balances[myId] !== undefined) {
-    updateBalanceUI(data.balances[myId]);
-  }
-
   const logClass = isDraw ? 'd' : (iWon ? 'w' : 'l');
   const logText = isDraw ? 'НИЧЬЯ' : (iWon ? 'ПОБЕДА' : 'ПРОИГРЫШ');
   roundLogs.unshift({ round: data.round, myChoice, oppChoice, result: logText, cls: logClass });
   renderLog();
+
+  // Show ready button after short delay
+  setTimeout(() => showReadyPhase(), 1500);
 });
 
 function renderLog() {
@@ -242,21 +273,6 @@ function renderLog() {
     </div>`
   ).join('');
 }
-
-// --- No Stars ---
-socket.on('no_stars', (data) => {
-  updateBalanceUI(data.balance);
-  $('noStarsOverlay').classList.add('active');
-});
-
-socket.on('opponent_no_stars', () => {
-  $('statusText').textContent = 'Соперник пополняет баланс...';
-});
-
-socket.on('balance_update', (data) => {
-  updateBalanceUI(data.balance);
-  $('noStarsOverlay').classList.remove('active');
-});
 
 // --- Game Over ---
 function endGame() {
@@ -274,7 +290,7 @@ socket.on('game_over', (data) => {
   $('goScore').textContent = `${myFinal} — ${oppFinal}`;
 
   const badge = $('goBadge');
-  if (myFinal > oppFinal) {
+  if (myFinal >= oppFinal) {
     badge.className = 'gameover-badge win-badge';
     badge.innerHTML = '<svg><use href="#icon-trophy"/></svg>';
   } else {
@@ -282,9 +298,6 @@ socket.on('game_over', (data) => {
     badge.innerHTML = '<svg><use href="#icon-skull"/></svg>';
   }
 
-  const currentBal = data.balances?.[myId] || myBalance;
-  updateBalanceUI(currentBal);
-  const diff = myFinal - oppFinal;
   $('goStars').textContent = myFinal > oppFinal ? 'Ты победил!' : (myFinal < oppFinal ? 'Поражение' : 'Ничья!');
   $('goStars').className = 'gameover-stars ' + (myFinal > oppFinal ? 'positive' : (myFinal < oppFinal ? 'negative' : ''));
   $('goBalance').textContent = `Счёт: ${myFinal} — ${oppFinal}`;
@@ -305,18 +318,15 @@ socket.on('opponent_wants_rematch', () => {
   $('goStars').className = 'gameover-stars';
 });
 
-socket.on('rematch_start', (data) => {
+socket.on('rematch_start', () => {
   myScore = 0;
   oppScore = 0;
   roundLogs = [];
   $('roundLog').innerHTML = '';
   updateScoreUI();
-  if (data.balances && data.balances[myId] !== undefined) {
-    startBalance = data.balances[myId];
-    updateBalanceUI(data.balances[myId]);
-  }
   $('btnExit').style.display = '';
   showScreen('screenGame');
+  showReadyPhase();
 });
 
 function requestRematch() {
@@ -325,67 +335,22 @@ function requestRematch() {
   $('goStars').className = 'gameover-stars';
 }
 
-// --- Deposit ---
-function showDeposit() {
-  showScreen('screenDeposit');
-}
-
-function deposit(amount) {
-  if (tg) {
-    tg.showAlert?.(`Для пополнения ${amount} ⭐ используй кнопку в боте`) ||
-    alert(`Для пополнения ${amount} ⭐ используй кнопку в боте`);
-  }
-}
-
-function depositFromGame(amount) {
-  deposit(amount);
-}
-
 // --- Profile ---
 function showProfile() {
   if (!myId) return;
   fetch(`/api/user/${myId}`)
     .then((r) => r.json())
     .then((u) => {
-      $('profBalance').textContent = `${u.balance} ⭐`;
       $('profWins').textContent = u.wins;
       $('profLosses').textContent = u.losses;
       $('profDraws').textContent = u.draws;
-      updateBalanceUI(u.balance);
     });
   showScreen('screenProfile');
-}
-
-async function requestRefund() {
-  if (!myId || myBalance <= 0) {
-    alert('Нечего выводить');
-    return;
-  }
-  if (!confirm(`Вывести ${myBalance} ⭐ обратно?`)) return;
-
-  try {
-    const res = await fetch('/api/refund', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: myId, initData }),
-    });
-    const data = await res.json();
-    if (data.error) {
-      alert(data.error);
-    } else {
-      alert(`Возвращено звёзд: ${data.refunded}`);
-      updateBalanceUI(data.balance);
-      $('profBalance').textContent = `${data.balance} ⭐`;
-    }
-  } catch {
-    alert('Ошибка при выводе');
-  }
 }
 
 function backToLobby() {
   $('btnExit').style.display = 'none';
   currentRoomId = null;
-  socket.emit('request_balance');
   showScreen('screenLobby');
 }
 
@@ -403,7 +368,6 @@ function copyLink() {
   }, 1500);
 }
 
-// --- Error ---
 socket.on('error', (data) => {
   alert(data.message || 'Ошибка');
 });

@@ -295,6 +295,52 @@ body {
   50% { transform: scale(1.12); }
 }
 
+/* Ready area */
+.ready-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  animation: fadeIn 0.3s ease;
+}
+.ready-btn {
+  max-width: 200px;
+  font-size: 18px;
+  letter-spacing: 3px;
+  padding: 18px 40px;
+  animation: glow 2s ease-in-out infinite;
+}
+.ready-btn:disabled {
+  opacity: 0.5;
+  animation: none;
+  cursor: default;
+}
+.ready-status {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 600;
+}
+.ready-dots {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  justify-content: center;
+}
+.ready-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--glass-border);
+  transition: all 0.3s;
+}
+.ready-dot.active {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+
 .status-text {
   font-size: 14px;
   color: var(--text2);

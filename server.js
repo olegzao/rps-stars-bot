@@ -156,12 +156,10 @@ function resolveRound(room) {
     balances,
   });
 
-  room.status = 'reveal';
-  setTimeout(() => {
-    if (room.status === 'reveal') {
-      startRound(room);
-    }
-  }, REVEAL_DELAY);
+  room.status = 'ready_check';
+  for (const p of Object.values(room.players)) {
+    p.ready = false;
+  }
 }
 
 // --- API ---
@@ -237,14 +235,17 @@ io.on('connection', (socket) => {
     });
 
     if (getPlayerIds(room).length === 2) {
+      room.status = 'ready_check';
+      for (const p of Object.values(room.players)) {
+        p.ready = false;
+      }
       broadcastToRoom(room, 'game_ready', {
         players: getPlayerIds(room).map((id) => {
           const u = getUser(id);
           return { id, username: u?.username || '', firstName: u?.first_name || '' };
         }),
       });
-
-      setTimeout(() => startRound(room), 1000);
+      broadcastToRoom(room, 'ready_check', { readyPlayers: [] });
     } else {
       socket.emit('waiting_opponent');
     }
@@ -269,6 +270,32 @@ io.on('connection', (socket) => {
     const ids = getPlayerIds(room);
     if (ids.every((id) => room.players[id].choice)) {
       resolveRound(room);
+    }
+  });
+
+  socket.on('player_ready', () => {
+    if (!playerId || !currentRoom) return;
+    const room = rooms.get(currentRoom);
+    if (!room || room.status !== 'ready_check') return;
+
+    const player = room.players[playerId];
+    if (!player || player.ready) return;
+
+    player.ready = true;
+
+    const ids = getPlayerIds(room);
+    const readyPlayers = ids.filter((id) => room.players[id].ready);
+
+    broadcastToRoom(room, 'ready_update', {
+      readyPlayers,
+      totalPlayers: ids.length,
+    });
+
+    if (ids.length === 2 && ids.every((id) => room.players[id].ready)) {
+      for (const p of Object.values(room.players)) {
+        p.ready = false;
+      }
+      setTimeout(() => startRound(room), 500);
     }
   });
 
