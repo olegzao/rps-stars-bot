@@ -3,56 +3,158 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>RPS Stars</title>
+  <title>RPS Battle</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 
+  <!-- SVG Sprite -->
+  <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-rock" viewBox="0 0 64 64">
+      <path d="M32 6C18 6 8 18 8 32c0 14 10 26 24 26s24-12 24-26C56 18 46 6 32 6z" fill="#6c63ff" opacity="0.15"/>
+      <path d="M20 38c0 0-2-8 2-14s12-10 18-8 8 8 8 14-2 14-10 18-14 2-18-2z" fill="none" stroke="#8b7cff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="28" cy="28" r="3" fill="#8b7cff" opacity="0.5"/>
+      <circle cx="38" cy="32" r="2" fill="#8b7cff" opacity="0.4"/>
+      <path d="M22 34c4-2 8 0 12-2s6-4 8-2" fill="none" stroke="#8b7cff" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+    </symbol>
+    <symbol id="icon-scissors" viewBox="0 0 64 64">
+      <circle cx="20" cy="44" r="8" fill="none" stroke="#ff6b81" stroke-width="2.5"/>
+      <circle cx="44" cy="44" r="8" fill="none" stroke="#ff6b81" stroke-width="2.5"/>
+      <line x1="26" y1="38" x2="44" y2="14" stroke="#ff6b81" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="38" y1="38" x2="20" y2="14" stroke="#ff6b81" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="32" cy="28" r="2" fill="#ff6b81" opacity="0.5"/>
+    </symbol>
+    <symbol id="icon-paper" viewBox="0 0 64 64">
+      <rect x="14" y="10" width="36" height="44" rx="4" fill="#f0b90b" opacity="0.12"/>
+      <rect x="14" y="10" width="36" height="44" rx="4" fill="none" stroke="#f0b90b" stroke-width="2.5"/>
+      <line x1="22" y1="22" x2="42" y2="22" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+      <line x1="22" y1="30" x2="38" y2="30" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+      <line x1="22" y1="38" x2="34" y2="38" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+      <path d="M40 42l6-6v10h-10l4-4z" fill="#f0b90b" opacity="0.2"/>
+    </symbol>
+    <symbol id="icon-timeout" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="22" fill="none" stroke="#6b6b80" stroke-width="2.5"/>
+      <line x1="32" y1="18" x2="32" y2="32" stroke="#6b6b80" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="32" y1="32" x2="42" y2="38" stroke="#6b6b80" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-trophy" viewBox="0 0 64 64">
+      <path d="M20 12h24v8c0 10-5 18-12 20-7-2-12-10-12-20v-8z" fill="#f0b90b" opacity="0.2"/>
+      <path d="M20 12h24v8c0 10-5 18-12 20-7-2-12-10-12-20v-8z" fill="none" stroke="#f0b90b" stroke-width="2.5"/>
+      <path d="M20 18h-6c0 8 4 12 6 12" fill="none" stroke="#f0b90b" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M44 18h6c0 8-4 12-6 12" fill="none" stroke="#f0b90b" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="26" y="40" width="12" height="4" rx="1" fill="#f0b90b" opacity="0.4"/>
+      <rect x="22" y="44" width="20" height="6" rx="2" fill="none" stroke="#f0b90b" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-skull" viewBox="0 0 64 64">
+      <path d="M32 10c-12 0-20 10-20 22 0 8 4 14 10 16v6h20v-6c6-2 10-8 10-16 0-12-8-22-20-22z" fill="none" stroke="#ff4757" stroke-width="2.5"/>
+      <circle cx="24" cy="30" r="5" fill="#ff4757" opacity="0.3"/>
+      <circle cx="40" cy="30" r="5" fill="#ff4757" opacity="0.3"/>
+      <path d="M28 42v6M32 42v6M36 42v6" stroke="#ff4757" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-user" viewBox="0 0 64 64">
+      <circle cx="32" cy="22" r="12" fill="none" stroke="#fff" stroke-width="2.5"/>
+      <path d="M12 54c0-10 8-18 20-18s20 8 20 18" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-gamepad" viewBox="0 0 64 64">
+      <rect x="8" y="18" width="48" height="28" rx="14" fill="none" stroke="#7c5cfc" stroke-width="2.5"/>
+      <circle cx="40" cy="28" r="3" fill="#7c5cfc"/>
+      <circle cx="46" cy="34" r="3" fill="#7c5cfc" opacity="0.5"/>
+      <line x1="20" y1="28" x2="20" y2="38" stroke="#7c5cfc" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="15" y1="33" x2="25" y2="33" stroke="#7c5cfc" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#f0b90b"/>
+    </symbol>
+    <symbol id="icon-bolt" viewBox="0 0 64 64">
+      <path d="M36 8L16 36h12L24 56l24-32H34L36 8z" fill="#f0b90b" opacity="0.15" stroke="#f0b90b" stroke-width="2.5" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+
   <!-- Header -->
   <div class="header">
-    <div class="balance" id="headerBalance">0 ⭐</div>
+    <div class="balance" id="headerBalance">
+      <svg class="star-icon"><use href="#icon-star"/></svg>
+      <span>0</span>
+    </div>
     <div class="score-display" id="headerScore"></div>
     <button class="btn-exit" id="btnExit" style="display:none" onclick="endGame()">Выход</button>
   </div>
 
   <!-- Lobby -->
   <div class="screen active" id="screenLobby">
-    <div class="lobby-title">✊✌️✋</div>
-    <div class="lobby-subtitle">Камень Ножницы Бумага</div>
-    <div class="lobby-balance" id="lobbyBalance">Баланс: 0 ⭐</div>
-    <button class="btn btn-primary" onclick="createRoom()">🎮 Создать комнату</button>
-    <button class="btn btn-accent" onclick="showDeposit()">💰 Пополнить баланс</button>
-    <button class="btn btn-secondary" onclick="showProfile()">👤 Профиль</button>
+    <div class="lobby-icon">
+      <svg><use href="#icon-gamepad"/></svg>
+    </div>
+    <div class="lobby-title">RPS Battle</div>
+    <div class="lobby-subtitle">Камень Ножницы Бумага — онлайн</div>
+    <div class="lobby-balance" id="lobbyBalance">
+      <svg style="width:18px;height:18px"><use href="#icon-star"/></svg>
+      <span>0</span>
+    </div>
+    <button class="btn btn-primary" onclick="createRoom()">
+      <svg style="width:20px;height:20px"><use href="#icon-gamepad"/></svg>
+      Создать комнату
+    </button>
+    <button class="btn btn-accent" onclick="showDeposit()">
+      <svg style="width:20px;height:20px"><use href="#icon-bolt"/></svg>
+      Пополнить баланс
+    </button>
+    <button class="btn btn-secondary" onclick="showProfile()">
+      <svg style="width:20px;height:20px;stroke:#fff;fill:none"><use href="#icon-user"/></svg>
+      Профиль
+    </button>
   </div>
 
   <!-- Waiting -->
   <div class="screen" id="screenWaiting">
     <div class="waiting-spinner"></div>
-    <div class="waiting-text">Ожидание соперника...</div>
+    <div class="waiting-text">Ожидание соперника</div>
+    <div class="waiting-sub">Отправь ссылку другу</div>
     <div class="room-link" id="roomLink"></div>
-    <button class="btn btn-secondary" style="margin-top:20px" onclick="copyLink()">📋 Скопировать ссылку</button>
+    <button class="btn btn-secondary" style="margin-top:16px" onclick="copyLink()">Скопировать ссылку</button>
   </div>
 
   <!-- Game -->
   <div class="screen" id="screenGame">
     <div class="game-area">
-      <div class="round-info" id="roundInfo">Раунд 1 • Банк: 2 ⭐</div>
-      <div class="timer" id="timer">5</div>
+      <div class="round-info" id="roundInfo">Раунд 1</div>
+
+      <div class="timer-container">
+        <div class="timer-ring"></div>
+        <div class="timer-ring-progress" id="timerRing"></div>
+        <div class="timer" id="timer">5</div>
+      </div>
+
       <div class="status-text" id="statusText">Выбирай!</div>
 
-      <!-- Reveal (hidden during choice phase) -->
+      <!-- Reveal -->
       <div class="reveal-area" id="revealArea" style="display:none">
-        <div class="reveal-choice" id="revealMy"></div>
+        <div class="reveal-card" id="revealMy">
+          <div class="choice-icon" id="revealMyIcon"></div>
+          <span class="reveal-label">ТЫ</span>
+        </div>
         <div class="reveal-vs">VS</div>
-        <div class="reveal-choice" id="revealOpp"></div>
+        <div class="reveal-card" id="revealOpp">
+          <div class="choice-icon" id="revealOppIcon"></div>
+          <span class="reveal-label">СОПЕРНИК</span>
+        </div>
       </div>
       <div class="result-text" id="resultText" style="display:none"></div>
 
       <div class="choices" id="choicesArea">
-        <button class="choice-btn" data-choice="rock" onclick="makeChoice('rock')">🪨</button>
-        <button class="choice-btn" data-choice="scissors" onclick="makeChoice('scissors')">✂️</button>
-        <button class="choice-btn" data-choice="paper" onclick="makeChoice('paper')">📄</button>
+        <button class="choice-btn" data-choice="rock" onclick="makeChoice('rock')">
+          <svg class="choice-icon"><use href="#icon-rock"/></svg>
+          <span class="choice-label">Камень</span>
+        </button>
+        <button class="choice-btn" data-choice="scissors" onclick="makeChoice('scissors')">
+          <svg class="choice-icon"><use href="#icon-scissors"/></svg>
+          <span class="choice-label">Ножницы</span>
+        </button>
+        <button class="choice-btn" data-choice="paper" onclick="makeChoice('paper')">
+          <svg class="choice-icon"><use href="#icon-paper"/></svg>
+          <span class="choice-label">Бумага</span>
+        </button>
       </div>
 
       <div class="round-log" id="roundLog"></div>
@@ -61,43 +163,74 @@
 
   <!-- Game Over -->
   <div class="screen" id="screenGameOver">
+    <div class="gameover-badge win-badge" id="goBadge">
+      <svg><use href="#icon-trophy"/></svg>
+    </div>
     <div class="gameover-title">Игра окончена</div>
     <div class="gameover-score" id="goScore">0 — 0</div>
-    <div class="gameover-stars" id="goStars">+0 ⭐</div>
-    <div class="gameover-balance" id="goBalance">Баланс: 0 ⭐</div>
-    <button class="btn btn-primary" onclick="requestRematch()">🔄 Реванш</button>
-    <button class="btn btn-secondary" onclick="backToLobby()">🚪 Выйти</button>
+    <div class="gameover-stars" id="goStars"></div>
+    <div class="gameover-balance" id="goBalance"></div>
+    <button class="btn btn-primary" onclick="requestRematch()">Реванш</button>
+    <button class="btn btn-secondary" onclick="backToLobby()">Выйти</button>
   </div>
 
   <!-- Deposit -->
   <div class="screen" id="screenDeposit">
     <div class="deposit-title">Пополнить баланс</div>
+    <div class="deposit-sub">Выбери количество звёзд</div>
     <div class="deposit-options">
-      <button class="btn btn-accent" onclick="deposit(10)">10 ⭐</button>
-      <button class="btn btn-accent" onclick="deposit(25)">25 ⭐</button>
-      <button class="btn btn-accent" onclick="deposit(50)">50 ⭐</button>
+      <button class="btn btn-accent" onclick="deposit(1)">
+        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 1 звезда
+      </button>
+      <button class="btn btn-accent" onclick="deposit(5)">
+        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 5 звёзд
+      </button>
+      <button class="btn btn-accent" onclick="deposit(10)">
+        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 10 звёзд
+      </button>
+      <button class="btn btn-accent" onclick="deposit(25)">
+        <svg style="width:18px;height:18px"><use href="#icon-star"/></svg> 25 звёзд
+      </button>
     </div>
-    <button class="btn btn-secondary" style="margin-top:20px;max-width:280px" onclick="backToLobby()">← Назад</button>
+    <button class="btn btn-secondary" style="margin-top:16px;max-width:280px" onclick="backToLobby()">Назад</button>
   </div>
 
   <!-- Profile -->
   <div class="screen" id="screenProfile">
-    <div class="deposit-title">Профиль</div>
-    <div class="profile-stat"><span class="profile-stat-label">Баланс</span><span class="profile-stat-value" id="profBalance">0 ⭐</span></div>
-    <div class="profile-stat"><span class="profile-stat-label">Победы</span><span class="profile-stat-value" id="profWins">0</span></div>
-    <div class="profile-stat"><span class="profile-stat-label">Поражения</span><span class="profile-stat-value" id="profLosses">0</span></div>
-    <div class="profile-stat"><span class="profile-stat-label">Ничьи</span><span class="profile-stat-value" id="profDraws">0</span></div>
-    <button class="btn btn-accent" style="margin-top:20px" onclick="requestRefund()">💸 Вывести звёзды</button>
-    <button class="btn btn-secondary" style="max-width:280px" onclick="backToLobby()">← Назад</button>
+    <div class="profile-avatar">
+      <svg style="stroke:#fff;fill:none"><use href="#icon-user"/></svg>
+    </div>
+    <div class="deposit-title" style="margin-bottom:16px">Профиль</div>
+    <div class="profile-card">
+      <div class="profile-stat">
+        <span class="profile-stat-label">Баланс</span>
+        <span class="profile-stat-value gold" id="profBalance">0 ⭐</span>
+      </div>
+      <div class="profile-stat">
+        <span class="profile-stat-label">Победы</span>
+        <span class="profile-stat-value green" id="profWins">0</span>
+      </div>
+      <div class="profile-stat">
+        <span class="profile-stat-label">Поражения</span>
+        <span class="profile-stat-value red" id="profLosses">0</span>
+      </div>
+      <div class="profile-stat">
+        <span class="profile-stat-label">Ничьи</span>
+        <span class="profile-stat-value" id="profDraws">0</span>
+      </div>
+    </div>
+    <button class="btn btn-accent" onclick="requestRefund()">Вывести звёзды</button>
+    <button class="btn btn-secondary" style="max-width:280px" onclick="backToLobby()">Назад</button>
   </div>
 
   <!-- No Stars Overlay -->
   <div class="no-stars-overlay" id="noStarsOverlay">
-    <div class="no-stars-emoji">😢</div>
+    <div class="no-stars-icon">
+      <svg><use href="#icon-bolt"/></svg>
+    </div>
     <div class="no-stars-text">Звёзды закончились!</div>
     <button class="btn btn-accent" onclick="depositFromGame(10)">Пополнить 10 ⭐</button>
     <button class="btn btn-accent" onclick="depositFromGame(25)">Пополнить 25 ⭐</button>
-    <button class="btn btn-accent" onclick="depositFromGame(50)">Пополнить 50 ⭐</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

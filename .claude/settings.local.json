@@ -8,7 +8,14 @@
       "Bash(node server.js)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(railway login:*)",
+      "Bash(gh api:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://rps-stars-bot.onrender.com)",
+      "WebFetch(domain:rps-stars-bot.onrender.com)",
+      "Bash(git push:*)"
     ]
   }
 }

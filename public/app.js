@@ -2,6 +2,8 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
+  tg.setHeaderColor('#08080f');
+  tg.setBackgroundColor('#08080f');
 }
 
 const socket = io();
@@ -16,7 +18,19 @@ let roundLogs = [];
 let startBalance = 0;
 let opponentInfo = null;
 
-const CHOICE_EMOJI = { rock: '🪨', scissors: '✂️', paper: '📄', timeout: '⏰' };
+const CHOICE_SVG = {
+  rock: '<svg style="width:36px;height:36px"><use href="#icon-rock"/></svg>',
+  scissors: '<svg style="width:36px;height:36px"><use href="#icon-scissors"/></svg>',
+  paper: '<svg style="width:36px;height:36px"><use href="#icon-paper"/></svg>',
+  timeout: '<svg style="width:36px;height:36px"><use href="#icon-timeout"/></svg>',
+};
+
+const CHOICE_MINI = {
+  rock: '<svg style="width:18px;height:18px"><use href="#icon-rock"/></svg>',
+  scissors: '<svg style="width:18px;height:18px"><use href="#icon-scissors"/></svg>',
+  paper: '<svg style="width:18px;height:18px"><use href="#icon-paper"/></svg>',
+  timeout: '<svg style="width:18px;height:18px"><use href="#icon-timeout"/></svg>',
+};
 
 // --- DOM ---
 const $ = (id) => document.getElementById(id);
@@ -28,8 +42,8 @@ function showScreen(id) {
 
 function updateBalanceUI(bal) {
   myBalance = bal;
-  $('headerBalance').textContent = `${bal} ⭐`;
-  $('lobbyBalance').textContent = `Баланс: ${bal} ⭐`;
+  $('headerBalance').querySelector('span').textContent = bal;
+  $('lobbyBalance').querySelector('span').textContent = bal;
 }
 
 function updateScoreUI() {
@@ -59,10 +73,6 @@ socket.on('auth_error', () => {
 
 // --- Room ---
 function createRoom() {
-  if (myBalance < 1) {
-    showDeposit();
-    return;
-  }
   socket.emit('join_room', {});
 }
 
@@ -112,7 +122,7 @@ socket.on('round_start', (data) => {
   $('revealArea').style.display = 'none';
   $('resultText').style.display = 'none';
   $('choicesArea').style.display = 'flex';
-  $('roundInfo').textContent = `Раунд ${data.round} • Банк: ${data.pot} ⭐`;
+  $('roundInfo').textContent = `РАУНД ${data.round}`;
   $('statusText').textContent = 'Выбирай!';
 
   if (data.balances && data.balances[myId] !== undefined) {
@@ -124,20 +134,31 @@ socket.on('round_start', (data) => {
     b.disabled = false;
   });
 
+  // Reset timer ring animation
+  const ring = $('timerRing');
+  ring.style.animation = 'none';
+  void ring.offsetWidth;
+  ring.style.animation = 'timer-spin 5s linear';
+
   startTimer(Math.ceil(data.timeMs / 1000));
 });
 
 function startTimer(seconds) {
   clearInterval(timerInterval);
   let t = seconds;
-  $('timer').textContent = t;
-  $('timer').style.display = '';
+  const timerEl = $('timer');
+  timerEl.textContent = t;
+  timerEl.style.display = '';
+  timerEl.classList.remove('urgent');
+
   timerInterval = setInterval(() => {
     t--;
-    $('timer').textContent = t;
-    $('timer').classList.remove('pulse');
-    void $('timer').offsetWidth;
-    $('timer').classList.add('pulse');
+    timerEl.textContent = t;
+    timerEl.classList.remove('pulse');
+    void timerEl.offsetWidth;
+    timerEl.classList.add('pulse');
+
+    if (t <= 2) timerEl.classList.add('urgent');
     if (t <= 0) clearInterval(timerInterval);
   }, 1000);
 }
@@ -158,35 +179,44 @@ socket.on('opponent_chose', () => {
 socket.on('round_result', (data) => {
   clearInterval(timerInterval);
   $('timer').style.display = 'none';
+  $('timerRing').style.animation = 'none';
   $('choicesArea').style.display = 'none';
 
   const myChoice = data.choices[myId];
   const oppId = Object.keys(data.choices).find((id) => Number(id) !== myId);
   const oppChoice = data.choices[oppId];
 
-  $('revealMy').textContent = CHOICE_EMOJI[myChoice] || '❓';
-  $('revealOpp').textContent = CHOICE_EMOJI[oppChoice] || '❓';
+  $('revealMyIcon').innerHTML = CHOICE_SVG[myChoice] || CHOICE_SVG.timeout;
+  $('revealOppIcon').innerHTML = CHOICE_SVG[oppChoice] || CHOICE_SVG.timeout;
   $('revealArea').style.display = 'flex';
 
   const iWon = data.winnerId === myId;
   const isDraw = data.result === 'draw';
 
-  $('revealMy').className = 'reveal-choice' + (iWon ? ' winner' : (!isDraw ? ' loser' : ''));
-  $('revealOpp').className = 'reveal-choice' + (!iWon && !isDraw ? ' winner' : (isDraw ? '' : ' loser'));
+  const myCard = $('revealMy');
+  const oppCard = $('revealOpp');
+  myCard.className = 'reveal-card' + (iWon ? ' winner' : (!isDraw ? ' loser' : ''));
+  oppCard.className = 'reveal-card' + (!iWon && !isDraw ? ' winner' : (isDraw ? '' : ' loser'));
+
+  // Re-trigger animation
+  [myCard, oppCard].forEach(c => {
+    c.style.animation = 'none';
+    void c.offsetWidth;
+    c.style.animation = 'revealIn 0.4s ease';
+  });
 
   if (isDraw) {
-    $('resultText').textContent = 'Ничья! 0 ⭐';
+    $('resultText').textContent = 'Ничья!';
     $('resultText').className = 'result-text draw';
   } else if (iWon) {
-    $('resultText').textContent = 'Победа! +2 ⭐';
+    $('resultText').textContent = 'Победа!';
     $('resultText').className = 'result-text win';
   } else {
-    $('resultText').textContent = 'Проигрыш! -1 ⭐';
+    $('resultText').textContent = 'Проигрыш';
     $('resultText').className = 'result-text lose';
   }
   $('resultText').style.display = '';
 
-  // Update scores
   if (data.scores) {
     myScore = data.scores[myId] || 0;
     oppScore = data.scores[oppId] || 0;
@@ -197,9 +227,8 @@ socket.on('round_result', (data) => {
     updateBalanceUI(data.balances[myId]);
   }
 
-  // Log
   const logClass = isDraw ? 'd' : (iWon ? 'w' : 'l');
-  const logText = isDraw ? 'Ничья' : (iWon ? 'Победа' : 'Проигрыш');
+  const logText = isDraw ? 'НИЧЬЯ' : (iWon ? 'ПОБЕДА' : 'ПРОИГРЫШ');
   roundLogs.unshift({ round: data.round, myChoice, oppChoice, result: logText, cls: logClass });
   renderLog();
 });
@@ -207,7 +236,8 @@ socket.on('round_result', (data) => {
 function renderLog() {
   $('roundLog').innerHTML = roundLogs.slice(0, 10).map((l) =>
     `<div class="log-entry">
-      <span>R${l.round}: ${CHOICE_EMOJI[l.myChoice]} vs ${CHOICE_EMOJI[l.oppChoice]}</span>
+      <span>R${l.round}</span>
+      <span class="log-icons">${CHOICE_MINI[l.myChoice]} vs ${CHOICE_MINI[l.oppChoice]}</span>
       <span class="log-result ${l.cls}">${l.result}</span>
     </div>`
   ).join('');
@@ -243,12 +273,21 @@ socket.on('game_over', (data) => {
 
   $('goScore').textContent = `${myFinal} — ${oppFinal}`;
 
-  const currentBal = data.balances[myId] || 0;
+  const badge = $('goBadge');
+  if (myFinal > oppFinal) {
+    badge.className = 'gameover-badge win-badge';
+    badge.innerHTML = '<svg><use href="#icon-trophy"/></svg>';
+  } else {
+    badge.className = 'gameover-badge lose-badge';
+    badge.innerHTML = '<svg><use href="#icon-skull"/></svg>';
+  }
+
+  const currentBal = data.balances?.[myId] || myBalance;
   updateBalanceUI(currentBal);
-  const diff = currentBal - startBalance;
-  $('goStars').textContent = (diff >= 0 ? '+' : '') + diff + ' ⭐';
-  $('goStars').className = 'gameover-stars ' + (diff >= 0 ? 'positive' : 'negative');
-  $('goBalance').textContent = `Баланс: ${currentBal} ⭐`;
+  const diff = myFinal - oppFinal;
+  $('goStars').textContent = myFinal > oppFinal ? 'Ты победил!' : (myFinal < oppFinal ? 'Поражение' : 'Ничья!');
+  $('goStars').className = 'gameover-stars ' + (myFinal > oppFinal ? 'positive' : (myFinal < oppFinal ? 'negative' : ''));
+  $('goBalance').textContent = `Счёт: ${myFinal} — ${oppFinal}`;
 
   showScreen('screenGameOver');
 });
@@ -293,9 +332,8 @@ function showDeposit() {
 
 function deposit(amount) {
   if (tg) {
-    tg.openInvoice && tg.showAlert
-      ? tg.showAlert(`Для пополнения ${amount} ⭐ используй кнопку в боте`)
-      : alert(`Для пополнения ${amount} ⭐ используй кнопку в боте`);
+    tg.showAlert?.(`Для пополнения ${amount} ⭐ используй кнопку в боте`) ||
+    alert(`Для пополнения ${amount} ⭐ используй кнопку в боте`);
   }
 }
 
@@ -356,8 +394,13 @@ function copyLink() {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(link);
   }
-  $('roomLink').textContent = 'Скопировано!';
-  setTimeout(() => { $('roomLink').textContent = link; }, 1500);
+  const el = $('roomLink');
+  el.textContent = 'Скопировано!';
+  el.style.color = '#00e676';
+  setTimeout(() => {
+    el.textContent = link;
+    el.style.color = '';
+  }, 1500);
 }
 
 // --- Error ---
