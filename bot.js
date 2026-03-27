@@ -25,12 +25,10 @@ function initBot(token, webAppUrl) {
       gameUrl = `${webAppUrl}?room=${roomId}`;
     }
 
-    bot.sendMessage(chatId, `Камень Ножницы Бумага на звёзды!\n\nТвой баланс: ${user.balance} ⭐`, {
+    bot.sendMessage(chatId, `⚔️ Камень Ножницы Бумага — онлайн!\n\nНажми "Играть" или создай комнату командой /game`, {
       reply_markup: {
         inline_keyboard: [
           [{ text: '🎮 Играть', web_app: { url: gameUrl } }],
-          [{ text: '💰 1 ⭐', callback_data: 'deposit_1' }, { text: '💰 5 ⭐', callback_data: 'deposit_5' }],
-          [{ text: '💰 10 ⭐', callback_data: 'deposit_10' }, { text: '💰 25 ⭐', callback_data: 'deposit_25' }],
         ],
       },
     });
