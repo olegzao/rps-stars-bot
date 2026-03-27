@@ -571,8 +571,8 @@ io.on('connection', (socket) => {
 
     if (ids.length === 2 && ids.every((id) => room.players[id].ready)) {
       for (const p of Object.values(room.players)) p.ready = false;
-      // Set turn order: first player who joined proposes first
-      room.turnOrder = ids;
+      // Randomize who goes first
+      room.turnOrder = Math.random() < 0.5 ? ids : [ids[1], ids[0]];
       room.turnIndex = 0;
       setTimeout(() => coinStartProposing(room), 500);
     }
