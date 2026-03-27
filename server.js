@@ -29,8 +29,9 @@ if (!BOT_TOKEN) {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// --- Rooms ---
+// --- Rooms & Matchmaking ---
 const rooms = new Map();
+const matchQueue = []; // [{playerId, socket}]
 
 function createRoom(roomId, playerId) {
   return {
@@ -262,6 +263,66 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('find_game', () => {
+    if (!playerId) return;
+
+    // Remove if already in queue
+    const idx = matchQueue.findIndex((q) => q.playerId === playerId);
+    if (idx !== -1) matchQueue.splice(idx, 1);
+
+    // Check if someone is waiting
+    if (matchQueue.length > 0) {
+      const opponent = matchQueue.shift();
+
+      // Make sure opponent is still connected
+      if (!opponent.socket.connected) {
+        // Opponent disconnected, put us in queue
+        matchQueue.push({ playerId, socket });
+        socket.emit('matching', { status: 'searching' });
+        return;
+      }
+
+      const roomId = crypto.randomBytes(4).toString('hex');
+      const room = createRoom(roomId, opponent.playerId);
+      room.players[playerId] = { id: playerId, choice: null, socket: null, score: 0, ready: false };
+      rooms.set(roomId, room);
+      createGame(roomId, opponent.playerId);
+      joinGame(playerId, roomId);
+
+      room.players[opponent.playerId].socket = opponent.socket;
+      room.players[playerId].socket = socket;
+
+      // Set current room for both
+      currentRoom = roomId;
+      opponent.currentRoom = roomId;
+
+      const playersList = getPlayerIds(room).map((id) => {
+        const u = getUser(id);
+        return { id, username: u?.username || '', firstName: u?.first_name || '' };
+      });
+
+      [opponent.socket, socket].forEach((s) => {
+        s.emit('room_joined', { roomId, players: playersList });
+      });
+
+      room.status = 'ready_check';
+      for (const p of Object.values(room.players)) {
+        p.ready = false;
+      }
+      broadcastToRoom(room, 'game_ready', { players: playersList });
+      broadcastToRoom(room, 'ready_check', { readyPlayers: [] });
+    } else {
+      matchQueue.push({ playerId, socket, currentRoom: null });
+      socket.emit('matching', { status: 'searching' });
+    }
+  });
+
+  socket.on('cancel_search', () => {
+    const idx = matchQueue.findIndex((q) => q.playerId === playerId);
+    if (idx !== -1) matchQueue.splice(idx, 1);
+    socket.emit('matching', { status: 'cancelled' });
+  });
+
   socket.on('make_choice', (data) => {
     if (!playerId || !currentRoom) return;
     const room = rooms.get(currentRoom);
@@ -370,6 +431,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    // Remove from matchmaking queue
+    const qIdx = matchQueue.findIndex((q) => q.playerId === playerId);
+    if (qIdx !== -1) matchQueue.splice(qIdx, 1);
+
     if (!currentRoom || !playerId) return;
     const room = rooms.get(currentRoom);
     if (!room) return;

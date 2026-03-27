@@ -60,6 +60,25 @@ socket.on('auth_error', () => {
   $('statusText').textContent = 'Ошибка авторизации';
 });
 
+// --- Matchmaking ---
+function findGame() {
+  socket.emit('find_game');
+  showScreen('screenSearching');
+}
+
+function cancelSearch() {
+  socket.emit('cancel_search');
+  showScreen('screenLobby');
+}
+
+socket.on('matching', (data) => {
+  if (data.status === 'searching') {
+    showScreen('screenSearching');
+  } else if (data.status === 'cancelled') {
+    showScreen('screenLobby');
+  }
+});
+
 // --- Room ---
 function createRoom() {
   socket.emit('join_room', {});

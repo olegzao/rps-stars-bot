@@ -84,14 +84,25 @@
     </div>
     <div class="lobby-title">RPS Battle</div>
     <div class="lobby-subtitle">Камень Ножницы Бумага — онлайн</div>
-    <button class="btn btn-primary" onclick="createRoom()">
+    <button class="btn btn-primary" onclick="findGame()">
       <svg style="width:20px;height:20px"><use href="#icon-gamepad"/></svg>
-      Создать комнату
+      Найти соперника
+    </button>
+    <button class="btn btn-secondary" onclick="createRoom()">
+      Создать комнату по ссылке
     </button>
     <button class="btn btn-secondary" onclick="showProfile()">
       <svg style="width:20px;height:20px;stroke:#fff;fill:none"><use href="#icon-user"/></svg>
       Профиль
     </button>
+  </div>
+
+  <!-- Searching -->
+  <div class="screen" id="screenSearching">
+    <div class="waiting-spinner"></div>
+    <div class="waiting-text">Поиск соперника...</div>
+    <div class="waiting-sub">Ожидание другого игрока</div>
+    <button class="btn btn-secondary" style="margin-top:20px" onclick="cancelSearch()">Отмена</button>
   </div>
 
   <!-- Waiting -->
