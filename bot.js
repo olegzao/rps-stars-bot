@@ -29,9 +29,8 @@ function initBot(token, webAppUrl) {
       reply_markup: {
         inline_keyboard: [
           [{ text: '🎮 Играть', web_app: { url: gameUrl } }],
-          [{ text: '💰 Пополнить 10 ⭐', callback_data: 'deposit_10' }],
-          [{ text: '💰 Пополнить 25 ⭐', callback_data: 'deposit_25' }],
-          [{ text: '💰 Пополнить 50 ⭐', callback_data: 'deposit_50' }],
+          [{ text: '💰 1 ⭐', callback_data: 'deposit_1' }, { text: '💰 5 ⭐', callback_data: 'deposit_5' }],
+          [{ text: '💰 10 ⭐', callback_data: 'deposit_10' }, { text: '💰 25 ⭐', callback_data: 'deposit_25' }],
         ],
       },
     });
@@ -70,7 +69,7 @@ function initBot(token, webAppUrl) {
     if (!data.startsWith('deposit_')) return;
 
     const amount = parseInt(data.replace('deposit_', ''), 10);
-    if (![10, 25, 50].includes(amount)) return;
+    if (![1, 5, 10, 25, 50].includes(amount)) return;
 
     bot.answerCallbackQuery(query.id);
 
