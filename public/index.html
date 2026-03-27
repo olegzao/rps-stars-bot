@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RPS Stars</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="balance" id="headerBalance">0 ⭐</div>
+    <div class="score-display" id="headerScore"></div>
+    <button class="btn-exit" id="btnExit" style="display:none" onclick="endGame()">Выход</button>
+  </div>
+
+  <!-- Lobby -->
+  <div class="screen active" id="screenLobby">
+    <div class="lobby-title">✊✌️✋</div>
+    <div class="lobby-subtitle">Камень Ножницы Бумага</div>
+    <div class="lobby-balance" id="lobbyBalance">Баланс: 0 ⭐</div>
+    <button class="btn btn-primary" onclick="createRoom()">🎮 Создать комнату</button>
+    <button class="btn btn-accent" onclick="showDeposit()">💰 Пополнить баланс</button>
+    <button class="btn btn-secondary" onclick="showProfile()">👤 Профиль</button>
+  </div>
+
+  <!-- Waiting -->
+  <div class="screen" id="screenWaiting">
+    <div class="waiting-spinner"></div>
+    <div class="waiting-text">Ожидание соперника...</div>
+    <div class="room-link" id="roomLink"></div>
+    <button class="btn btn-secondary" style="margin-top:20px" onclick="copyLink()">📋 Скопировать ссылку</button>
+  </div>
+
+  <!-- Game -->
+  <div class="screen" id="screenGame">
+    <div class="game-area">
+      <div class="round-info" id="roundInfo">Раунд 1 • Банк: 2 ⭐</div>
+      <div class="timer" id="timer">5</div>
+      <div class="status-text" id="statusText">Выбирай!</div>
+
+      <!-- Reveal (hidden during choice phase) -->
+      <div class="reveal-area" id="revealArea" style="display:none">
+        <div class="reveal-choice" id="revealMy"></div>
+        <div class="reveal-vs">VS</div>
+        <div class="reveal-choice" id="revealOpp"></div>
+      </div>
+      <div class="result-text" id="resultText" style="display:none"></div>
+
+      <div class="choices" id="choicesArea">
+        <button class="choice-btn" data-choice="rock" onclick="makeChoice('rock')">🪨</button>
+        <button class="choice-btn" data-choice="scissors" onclick="makeChoice('scissors')">✂️</button>
+        <button class="choice-btn" data-choice="paper" onclick="makeChoice('paper')">📄</button>
+      </div>
+
+      <div class="round-log" id="roundLog"></div>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div class="screen" id="screenGameOver">
+    <div class="gameover-title">Игра окончена</div>
+    <div class="gameover-score" id="goScore">0 — 0</div>
+    <div class="gameover-stars" id="goStars">+0 ⭐</div>
+    <div class="gameover-balance" id="goBalance">Баланс: 0 ⭐</div>
+    <button class="btn btn-primary" onclick="requestRematch()">🔄 Реванш</button>
+    <button class="btn btn-secondary" onclick="backToLobby()">🚪 Выйти</button>
+  </div>
+
+  <!-- Deposit -->
+  <div class="screen" id="screenDeposit">
+    <div class="deposit-title">Пополнить баланс</div>
+    <div class="deposit-options">
+      <button class="btn btn-accent" onclick="deposit(10)">10 ⭐</button>
+      <button class="btn btn-accent" onclick="deposit(25)">25 ⭐</button>
+      <button class="btn btn-accent" onclick="deposit(50)">50 ⭐</button>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:20px;max-width:280px" onclick="backToLobby()">← Назад</button>
+  </div>
+
+  <!-- Profile -->
+  <div class="screen" id="screenProfile">
+    <div class="deposit-title">Профиль</div>
+    <div class="profile-stat"><span class="profile-stat-label">Баланс</span><span class="profile-stat-value" id="profBalance">0 ⭐</span></div>
+    <div class="profile-stat"><span class="profile-stat-label">Победы</span><span class="profile-stat-value" id="profWins">0</span></div>
+    <div class="profile-stat"><span class="profile-stat-label">Поражения</span><span class="profile-stat-value" id="profLosses">0</span></div>
+    <div class="profile-stat"><span class="profile-stat-label">Ничьи</span><span class="profile-stat-value" id="profDraws">0</span></div>
+    <button class="btn btn-accent" style="margin-top:20px" onclick="requestRefund()">💸 Вывести звёзды</button>
+    <button class="btn btn-secondary" style="max-width:280px" onclick="backToLobby()">← Назад</button>
+  </div>
+
+  <!-- No Stars Overlay -->
+  <div class="no-stars-overlay" id="noStarsOverlay">
+    <div class="no-stars-emoji">😢</div>
+    <div class="no-stars-text">Звёзды закончились!</div>
+    <button class="btn btn-accent" onclick="depositFromGame(10)">Пополнить 10 ⭐</button>
+    <button class="btn btn-accent" onclick="depositFromGame(25)">Пополнить 25 ⭐</button>
+    <button class="btn btn-accent" onclick="depositFromGame(50)">Пополнить 50 ⭐</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
