@@ -25,7 +25,7 @@ function initBot(token, webAppUrl) {
       gameUrl = `${webAppUrl}?room=${roomId}`;
     }
 
-    bot.sendMessage(chatId, `⚔️ Камень Ножницы Бумага — онлайн!\n\nНажми "Играть" или создай комнату командой /game`, {
+    bot.sendMessage(chatId, `Здарова, ${firstName}! 🤙\n\nЖми "Играть" и покажи кто тут главный`, {
       reply_markup: {
         inline_keyboard: [
           [{ text: '🎮 Играть', web_app: { url: gameUrl } }],
