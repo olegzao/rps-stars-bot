@@ -19,6 +19,7 @@ const WEBAPP_URL = process.env.WEBAPP_URL || 'http://localhost:3000';
 const PORT = process.env.PORT || 3000;
 const ROUND_TIME = 5000;
 const STAKE = 1;
+const COIN_STARTING_POINTS = 10;
 
 if (!BOT_TOKEN) {
   console.error('BOT_TOKEN is required in .env');
@@ -31,6 +32,130 @@ app.use(express.json());
 // --- Rooms & Matchmaking ---
 const rooms = new Map();
 const matchQueue = []; // [{playerId, socket}]
+
+// --- Coin Flip Rooms & Matchmaking ---
+const coinRooms = new Map();
+const coinMatchQueue = [];
+
+function newCoinRoom(roomId, playerId) {
+  return {
+    id: roomId,
+    gameType: 'coin',
+    players: {
+      [playerId]: { id: playerId, points: COIN_STARTING_POINTS, bet: null, choice: null, socket: null, ready: false, roundsWon: 0 }
+    },
+    round: 0,
+    status: 'waiting',
+    timer: null,
+    coinResult: null,
+  };
+}
+
+function coinGetPlayerIds(room) {
+  return Object.keys(room.players).map(Number);
+}
+
+function coinGetOpponentId(room, playerId) {
+  return coinGetPlayerIds(room).find((id) => id !== playerId);
+}
+
+function coinBroadcast(room, event, data) {
+  for (const p of Object.values(room.players)) {
+    if (p.socket) p.socket.emit(event, data);
+  }
+}
+
+function coinGetPoints(room) {
+  const pts = {};
+  for (const pid of coinGetPlayerIds(room)) pts[pid] = room.players[pid].points;
+  return pts;
+}
+
+function coinEnterReadyCheck(room) {
+  room.status = 'ready_check';
+  for (const p of Object.values(room.players)) {
+    p.ready = false;
+    p.bet = null;
+    p.choice = null;
+  }
+
+  const playersList = coinGetPlayerIds(room).map((id) => {
+    const u = getUser(id);
+    return { id, username: u?.username || '', firstName: u?.first_name || '' };
+  });
+
+  coinBroadcast(room, 'coin_game_ready', { players: playersList, points: coinGetPoints(room) });
+  coinBroadcast(room, 'coin_ready_check', { readyPlayers: [] });
+}
+
+function coinStartBetting(room) {
+  room.round++;
+  room.status = 'betting';
+  for (const p of Object.values(room.players)) {
+    p.bet = null;
+    p.choice = null;
+  }
+
+  coinBroadcast(room, 'coin_betting_start', {
+    round: room.round,
+    points: coinGetPoints(room),
+  });
+}
+
+function coinFlip(room) {
+  room.status = 'flipping';
+  room.coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
+
+  const ids = coinGetPlayerIds(room);
+  const [p1Id, p2Id] = ids;
+  const p1 = room.players[p1Id], p2 = room.players[p2Id];
+
+  let winnerId = null, loserId = null;
+
+  if (p1.choice === room.coinResult && p2.choice !== room.coinResult) {
+    winnerId = p1Id; loserId = p2Id;
+  } else if (p2.choice === room.coinResult && p1.choice !== room.coinResult) {
+    winnerId = p2Id; loserId = p1Id;
+  }
+
+  let transferAmount = 0;
+  if (winnerId && loserId) {
+    const winnerBet = room.players[winnerId].bet;
+    const loserBet = room.players[loserId].bet;
+    transferAmount = Math.min(winnerBet, loserBet, room.players[loserId].points);
+    room.players[winnerId].points += transferAmount;
+    room.players[loserId].points -= transferAmount;
+    room.players[winnerId].roundsWon++;
+  }
+
+  addRound(room.id, room.round, p1.choice || 'none', p2.choice || 'none', winnerId);
+
+  coinBroadcast(room, 'coin_flip_result', {
+    round: room.round,
+    coinResult: room.coinResult,
+    choices: { [p1Id]: p1.choice, [p2Id]: p2.choice },
+    bets: { [p1Id]: p1.bet, [p2Id]: p2.bet },
+    winnerId,
+    loserId,
+    transferAmount,
+    points: coinGetPoints(room),
+    roundsWon: { [p1Id]: p1.roundsWon, [p2Id]: p2.roundsWon },
+  });
+
+  const someoneOut = ids.some((id) => room.players[id].points <= 0);
+
+  if (someoneOut) {
+    setTimeout(() => {
+      const scores = {};
+      ids.forEach((id) => { scores[id] = room.players[id].roundsWon; });
+      coinBroadcast(room, 'coin_game_over', { scores, points: coinGetPoints(room), reason: 'bankrupt' });
+      endGameDb(room.id);
+      room.status = 'finished';
+    }, 3000);
+  } else {
+    setTimeout(() => coinEnterReadyCheck(room), 3000);
+  }
+}
 
 function newRoom(roomId, playerId) {
   return {
@@ -372,6 +497,156 @@ io.on('connection', (socket) => {
     }
   });
 
+  // === COIN FLIP EVENTS ===
+  socket.on('coin_find_game', () => {
+    if (!socket._playerId) return;
+    const pid = socket._playerId;
+
+    const idx = coinMatchQueue.findIndex((q) => q.playerId === pid);
+    if (idx !== -1) coinMatchQueue.splice(idx, 1);
+
+    if (coinMatchQueue.length > 0) {
+      const opponent = coinMatchQueue.shift();
+      if (!opponent.socket.connected) {
+        coinMatchQueue.push({ playerId: pid, socket });
+        socket.emit('coin_matching', { status: 'searching' });
+        return;
+      }
+
+      const roomId = 'coin_' + crypto.randomBytes(4).toString('hex');
+      const room = newCoinRoom(roomId, opponent.playerId);
+      room.players[pid] = { id: pid, points: COIN_STARTING_POINTS, bet: null, choice: null, socket: null, ready: false, roundsWon: 0 };
+      coinRooms.set(roomId, room);
+      createGame(roomId, opponent.playerId);
+      joinGame(pid, roomId);
+
+      room.players[opponent.playerId].socket = opponent.socket;
+      room.players[pid].socket = socket;
+
+      socket._currentRoom = roomId;
+      socket._gameType = 'coin';
+      opponent.socket._currentRoom = roomId;
+      opponent.socket._gameType = 'coin';
+
+      const playersList = coinGetPlayerIds(room).map((id) => {
+        const u = getUser(id);
+        return { id, username: u?.username || '', firstName: u?.first_name || '' };
+      });
+
+      [opponent.socket, socket].forEach((s) => {
+        s.emit('coin_room_joined', { roomId, players: playersList, points: coinGetPoints(room) });
+      });
+
+      coinEnterReadyCheck(room);
+    } else {
+      coinMatchQueue.push({ playerId: pid, socket });
+      socket.emit('coin_matching', { status: 'searching' });
+    }
+  });
+
+  socket.on('coin_cancel_search', () => {
+    const idx = coinMatchQueue.findIndex((q) => q.playerId === socket._playerId);
+    if (idx !== -1) coinMatchQueue.splice(idx, 1);
+    socket.emit('coin_matching', { status: 'cancelled' });
+  });
+
+  socket.on('coin_player_ready', () => {
+    const pid = socket._playerId;
+    const roomId = socket._currentRoom;
+    if (!pid || !roomId) return;
+    const room = coinRooms.get(roomId);
+    if (!room || room.status !== 'ready_check') return;
+
+    const player = room.players[pid];
+    if (!player || player.ready) return;
+    player.ready = true;
+
+    const ids = coinGetPlayerIds(room);
+    const readyPlayers = ids.filter((id) => room.players[id].ready);
+    coinBroadcast(room, 'coin_ready_update', { readyPlayers, totalPlayers: ids.length });
+
+    if (ids.length === 2 && ids.every((id) => room.players[id].ready)) {
+      for (const p of Object.values(room.players)) p.ready = false;
+      setTimeout(() => coinStartBetting(room), 500);
+    }
+  });
+
+  socket.on('coin_place_bet', (data) => {
+    const pid = socket._playerId;
+    const roomId = socket._currentRoom;
+    if (!pid || !roomId) return;
+    const room = coinRooms.get(roomId);
+    if (!room || room.status !== 'betting') return;
+
+    const player = room.players[pid];
+    if (!player || player.bet !== null) return;
+
+    const bet = parseInt(data.bet, 10);
+    const choice = data.choice;
+
+    if (!bet || bet < 1 || bet > 5 || bet > player.points) return;
+    if (choice !== 'heads' && choice !== 'tails') return;
+
+    player.bet = bet;
+    player.choice = choice;
+
+    const oppId = coinGetOpponentId(room, pid);
+    if (oppId && room.players[oppId]?.socket) {
+      room.players[oppId].socket.emit('coin_opponent_bet_placed');
+    }
+
+    const ids = coinGetPlayerIds(room);
+    if (ids.every((id) => room.players[id].bet !== null)) {
+      setTimeout(() => coinFlip(room), 500);
+    }
+  });
+
+  socket.on('coin_end_game', () => {
+    const roomId = socket._currentRoom;
+    if (!roomId) return;
+    const room = coinRooms.get(roomId);
+    if (!room) return;
+
+    if (room.timer) { clearTimeout(room.timer); room.timer = null; }
+
+    const ids = coinGetPlayerIds(room);
+    const scores = {};
+    ids.forEach((id) => { scores[id] = room.players[id]?.roundsWon || 0; });
+
+    coinBroadcast(room, 'coin_game_over', { scores, points: coinGetPoints(room), reason: 'quit' });
+    endGameDb(room.id);
+    room.status = 'finished';
+  });
+
+  socket.on('coin_rematch', () => {
+    const pid = socket._playerId;
+    const roomId = socket._currentRoom;
+    if (!pid || !roomId) return;
+    const room = coinRooms.get(roomId);
+    if (!room || room.status !== 'finished') return;
+
+    room.players[pid].ready = true;
+
+    const ids = coinGetPlayerIds(room);
+    if (ids.every((id) => room.players[id]?.ready)) {
+      room.round = 0;
+      ids.forEach((id) => {
+        room.players[id].ready = false;
+        room.players[id].choice = null;
+        room.players[id].bet = null;
+        room.players[id].points = COIN_STARTING_POINTS;
+        room.players[id].roundsWon = 0;
+      });
+      coinBroadcast(room, 'coin_rematch_start', { points: coinGetPoints(room) });
+      setTimeout(() => coinEnterReadyCheck(room), 500);
+    } else {
+      const oppId = coinGetOpponentId(room, pid);
+      if (oppId && room.players[oppId]?.socket) {
+        room.players[oppId].socket.emit('coin_opponent_wants_rematch');
+      }
+    }
+  });
+
   socket.on('request_balance', () => {
     if (!socket._playerId) return;
     const user = getUser(socket._playerId);
@@ -382,11 +657,33 @@ io.on('connection', (socket) => {
     const pid = socket._playerId;
     const roomId = socket._currentRoom;
 
-    // Remove from matchmaking queue
+    // Remove from matchmaking queues
     const qIdx = matchQueue.findIndex((q) => q.playerId === pid);
     if (qIdx !== -1) matchQueue.splice(qIdx, 1);
+    const cqIdx = coinMatchQueue.findIndex((q) => q.playerId === pid);
+    if (cqIdx !== -1) coinMatchQueue.splice(cqIdx, 1);
 
     if (!roomId || !pid) return;
+
+    // Handle coin room disconnect
+    const coinRoom = coinRooms.get(roomId);
+    if (coinRoom) {
+      const oppId = coinGetOpponentId(coinRoom, pid);
+      if (oppId && coinRoom.players[oppId]?.socket) {
+        coinRoom.players[oppId].socket.emit('coin_opponent_disconnected');
+      }
+      if (coinRoom.players[pid]) coinRoom.players[pid].socket = null;
+      if (coinRoom.timer) { clearTimeout(coinRoom.timer); coinRoom.timer = null; }
+      setTimeout(() => {
+        const r = coinRooms.get(roomId);
+        if (r && coinGetPlayerIds(r).every((id) => !r.players[id]?.socket)) {
+          coinRooms.delete(roomId);
+        }
+      }, 60000);
+      return;
+    }
+
+    // Handle RPS room disconnect
     const room = rooms.get(roomId);
     if (!room) return;
 

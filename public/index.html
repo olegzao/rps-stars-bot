@@ -69,6 +69,12 @@
     <symbol id="icon-bolt" viewBox="0 0 64 64">
       <path d="M36 8L16 36h12L24 56l24-32H34L36 8z" fill="#f0b90b" opacity="0.15" stroke="#f0b90b" stroke-width="2.5" stroke-linejoin="round"/>
     </symbol>
+    <symbol id="icon-coin" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r="24" fill="#f0b90b" opacity="0.15"/>
+      <circle cx="32" cy="32" r="24" fill="none" stroke="#f0b90b" stroke-width="2.5"/>
+      <circle cx="32" cy="32" r="16" fill="none" stroke="#f0b90b" stroke-width="1.5" opacity="0.4"/>
+      <text x="32" y="38" text-anchor="middle" fill="#f0b90b" font-size="18" font-weight="900">$</text>
+    </symbol>
   </svg>
 
   <!-- Header -->
@@ -82,19 +88,42 @@
     <div class="lobby-icon">
       <svg><use href="#icon-gamepad"/></svg>
     </div>
-    <div class="lobby-title">RPS Battle</div>
-    <div class="lobby-subtitle">Камень Ножницы Бумага — онлайн</div>
-    <button class="btn btn-primary" onclick="findGame()">
-      <svg style="width:20px;height:20px"><use href="#icon-gamepad"/></svg>
-      Найти соперника
-    </button>
-    <button class="btn btn-secondary" onclick="createRoom()">
-      Создать комнату по ссылке
-    </button>
+    <div class="lobby-title">Game Hub</div>
+    <div class="lobby-subtitle">Выбери игру и играй онлайн</div>
+
+    <div class="game-select">
+      <button class="game-card" onclick="selectGame('rps')">
+        <div class="game-card-icon">
+          <svg><use href="#icon-rock"/></svg>
+        </div>
+        <div class="game-card-title">Камень Ножницы Бумага</div>
+        <div class="game-card-desc">Классика — 5 сек на выбор</div>
+      </button>
+      <button class="game-card" onclick="selectGame('coin')">
+        <div class="game-card-icon">
+          <svg><use href="#icon-coin"/></svg>
+        </div>
+        <div class="game-card-title">Орёл и Решка</div>
+        <div class="game-card-desc">Ставки от 1 до 5 баллов</div>
+      </button>
+    </div>
+
     <button class="btn btn-secondary" onclick="showProfile()">
       <svg style="width:20px;height:20px;stroke:#fff;fill:none"><use href="#icon-user"/></svg>
       Профиль
     </button>
+  </div>
+
+  <!-- Game Menu (after selecting game type) -->
+  <div class="screen" id="screenGameMenu">
+    <div class="lobby-icon" id="gameMenuIcon"></div>
+    <div class="lobby-title" id="gameMenuTitle"></div>
+    <div class="lobby-subtitle" id="gameMenuSub"></div>
+    <button class="btn btn-primary" id="btnFindOpponent">
+      <svg style="width:20px;height:20px"><use href="#icon-gamepad"/></svg>
+      Найти соперника
+    </button>
+    <button class="btn btn-secondary" onclick="backToLobby()">Назад</button>
   </div>
 
   <!-- Searching -->
@@ -165,6 +194,88 @@
 
       <div class="round-log" id="roundLog"></div>
     </div>
+  </div>
+
+  <!-- Coin Flip Game -->
+  <div class="screen" id="screenCoinGame">
+    <div class="game-area">
+      <div class="coin-header">
+        <div class="coin-points-display">
+          <span class="coin-pts-label">ТЫ</span>
+          <span class="coin-pts-value" id="coinMyPoints">10</span>
+        </div>
+        <div class="coin-round-info" id="coinRoundInfo">Раунд 1</div>
+        <div class="coin-points-display">
+          <span class="coin-pts-label" id="coinOppLabel">СОПЕРНИК</span>
+          <span class="coin-pts-value" id="coinOppPoints">10</span>
+        </div>
+      </div>
+
+      <div class="coin-opponent-name" id="coinOpponentName"></div>
+      <div class="coin-status" id="coinStatus">Ожидание...</div>
+
+      <!-- Ready phase -->
+      <div class="coin-ready-area" id="coinReadyArea" style="display:none">
+        <button class="btn btn-green ready-btn" id="coinBtnReady" onclick="coinPlayerReady()">ГОТОВ</button>
+        <div class="ready-status" id="coinReadyStatus">Нажмите "Готов"</div>
+      </div>
+
+      <!-- Betting phase -->
+      <div class="coin-betting-area" id="coinBettingArea" style="display:none">
+        <div class="coin-bet-title">Сделай ставку</div>
+        <div class="coin-bet-buttons" id="coinBetButtons">
+          <button class="coin-bet-btn" onclick="selectBet(1)">1</button>
+          <button class="coin-bet-btn" onclick="selectBet(2)">2</button>
+          <button class="coin-bet-btn" onclick="selectBet(3)">3</button>
+          <button class="coin-bet-btn" onclick="selectBet(4)">4</button>
+          <button class="coin-bet-btn" onclick="selectBet(5)">5</button>
+        </div>
+        <div class="coin-choice-title">Выбери сторону</div>
+        <div class="coin-choice-buttons">
+          <button class="coin-side-btn" id="btnHeads" onclick="selectSide('heads')">
+            <div class="coin-side-icon heads">O</div>
+            <span>Орёл</span>
+          </button>
+          <button class="coin-side-btn" id="btnTails" onclick="selectSide('tails')">
+            <div class="coin-side-icon tails">P</div>
+            <span>Решка</span>
+          </button>
+        </div>
+        <button class="btn btn-accent coin-confirm-btn" id="coinConfirmBet" onclick="confirmBet()" disabled>
+          Поставить
+        </button>
+      </div>
+
+      <!-- Coin animation -->
+      <div class="coin-flip-area" id="coinFlipArea" style="display:none">
+        <div class="coin-3d" id="coin3d">
+          <div class="coin-face coin-heads">O</div>
+          <div class="coin-face coin-tails">P</div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="coin-result-area" id="coinResultArea" style="display:none">
+        <div class="coin-result-side" id="coinResultSide"></div>
+        <div class="coin-result-text" id="coinResultText"></div>
+        <div class="coin-result-transfer" id="coinResultTransfer"></div>
+      </div>
+
+      <div class="round-log" id="coinRoundLog"></div>
+    </div>
+  </div>
+
+  <!-- Coin Game Over -->
+  <div class="screen" id="screenCoinGameOver">
+    <div class="gameover-badge win-badge" id="coinGoBadge">
+      <svg><use href="#icon-trophy"/></svg>
+    </div>
+    <div class="gameover-title">Игра окончена</div>
+    <div class="gameover-score" id="coinGoScore">0 — 0</div>
+    <div class="gameover-stars" id="coinGoStars"></div>
+    <div class="gameover-balance" id="coinGoBalance"></div>
+    <button class="btn btn-primary" onclick="coinRequestRematch()">Реванш</button>
+    <button class="btn btn-secondary" onclick="backToLobby()">Выйти</button>
   </div>
 
   <!-- Game Over -->
