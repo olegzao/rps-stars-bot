@@ -72,7 +72,7 @@ function selectGame(type) {
   } else {
     $('gameMenuIcon').innerHTML = '<svg style="width:100%;height:100%;filter:drop-shadow(0 0 30px rgba(240,185,11,0.25))"><use href="#icon-coin"/></svg>';
     $('gameMenuTitle').textContent = 'Орёл и Решка';
-    $('gameMenuSub').textContent = 'Ставки 1-5 баллов • 10 баллов на старте';
+    $('gameMenuSub').textContent = 'Ставки 1-10 • ходы по очереди • 10 баллов';
     $('btnFindOpponent').onclick = () => coinFindGame();
   }
   showScreen('screenGameMenu');
