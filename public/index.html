@@ -220,15 +220,15 @@
         <div class="ready-status" id="coinReadyStatus">Нажмите "Готов"</div>
       </div>
 
-      <!-- Betting phase -->
+      <!-- Betting phase (proposer) -->
       <div class="coin-betting-area" id="coinBettingArea" style="display:none">
         <div class="coin-bet-title">Сделай ставку</div>
         <div class="coin-bet-buttons" id="coinBetButtons">
           <button class="coin-bet-btn" onclick="selectBet(1)">1</button>
           <button class="coin-bet-btn" onclick="selectBet(2)">2</button>
           <button class="coin-bet-btn" onclick="selectBet(3)">3</button>
-          <button class="coin-bet-btn" onclick="selectBet(4)">4</button>
           <button class="coin-bet-btn" onclick="selectBet(5)">5</button>
+          <button class="coin-bet-btn" onclick="selectBet(10)">10</button>
         </div>
         <div class="coin-choice-title">Выбери сторону</div>
         <div class="coin-choice-buttons">
@@ -244,6 +244,15 @@
         <button class="btn btn-accent coin-confirm-btn" id="coinConfirmBet" onclick="confirmBet()" disabled>
           Поставить
         </button>
+      </div>
+
+      <!-- Respond to bet (responder) -->
+      <div class="coin-respond-area" id="coinRespondArea" style="display:none">
+        <div class="coin-proposal-info" id="coinProposalInfo"></div>
+        <div class="coin-respond-buttons">
+          <button class="btn btn-green" onclick="coinAcceptBet()">Принять</button>
+          <button class="btn btn-secondary" onclick="coinDeclineBet()">Отказаться (-1)</button>
+        </div>
       </div>
 
       <!-- Coin animation -->

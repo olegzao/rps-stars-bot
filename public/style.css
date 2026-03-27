@@ -1023,3 +1023,41 @@ body {
   font-weight: 700;
   font-size: 12px;
 }
+
+/* Coin Respond Area */
+.coin-respond-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: fadeIn 0.3s ease;
+  width: 100%;
+  max-width: 320px;
+}
+
+.coin-proposal-info {
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  line-height: 1.5;
+  width: 100%;
+}
+.coin-proposal-info strong {
+  color: var(--accent);
+}
+
+.coin-respond-buttons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+.coin-respond-buttons .btn {
+  flex: 1;
+  max-width: none;
+  padding: 14px 16px;
+  font-size: 14px;
+}

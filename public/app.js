@@ -392,6 +392,7 @@ let coinSelectedSide = null;
 let coinRoundLogs = [];
 let coinOpponentInfo = null;
 let coinIsReady = false;
+let coinCurrentMaxBet = 10;
 
 function coinFindGame() {
   currentGameType = 'coin';
@@ -422,17 +423,19 @@ socket.on('coin_game_ready', (data) => {
   $('coinOppLabel').textContent = oppName.toUpperCase();
   $('btnExit').style.display = '';
 
-  if (data.points) {
-    coinMyPoints = data.points[myId] || 10;
-    const oppId = Object.keys(data.points).find((id) => Number(id) !== myId);
-    coinOppPoints = data.points[oppId] || 10;
-    $('coinMyPoints').textContent = coinMyPoints;
-    $('coinOppPoints').textContent = coinOppPoints;
-  }
-
+  coinUpdatePoints(data.points);
   showScreen('screenCoinGame');
   coinShowReadyPhase();
 });
+
+function coinUpdatePoints(points) {
+  if (!points) return;
+  coinMyPoints = points[myId] || 0;
+  const oppId = Object.keys(points).find((id) => Number(id) !== myId);
+  coinOppPoints = points[oppId] || 0;
+  $('coinMyPoints').textContent = coinMyPoints;
+  $('coinOppPoints').textContent = coinOppPoints;
+}
 
 socket.on('coin_ready_check', () => {
   coinShowReadyPhase();
@@ -467,6 +470,7 @@ function coinShowReadyPhase() {
   $('coinBettingArea').style.display = 'none';
   $('coinFlipArea').style.display = 'none';
   $('coinResultArea').style.display = 'none';
+  $('coinRespondArea').style.display = 'none';
   $('coinStatus').textContent = 'Подтвердите готовность';
   const btn = $('coinBtnReady');
   btn.disabled = false;
@@ -483,38 +487,41 @@ function coinPlayerReady() {
   $('coinBtnReady').textContent = 'ГОТОВ ✓';
 }
 
-// --- Betting ---
-socket.on('coin_betting_start', (data) => {
+// --- Turn-based Proposing ---
+socket.on('coin_propose_turn', (data) => {
   $('coinRoundInfo').textContent = `РАУНД ${data.round}`;
   $('coinReadyArea').style.display = 'none';
   $('coinFlipArea').style.display = 'none';
   $('coinResultArea').style.display = 'none';
-  $('coinBettingArea').style.display = 'flex';
-  $('coinStatus').textContent = 'Сделай ставку и выбери сторону';
+  $('coinRespondArea').style.display = 'none';
+  coinUpdatePoints(data.points);
+  coinCurrentMaxBet = data.maxBet;
 
-  coinSelectedBet = null;
-  coinSelectedSide = null;
-  $('coinConfirmBet').disabled = true;
+  if (data.proposerId === myId) {
+    // I'm the proposer — show betting UI
+    $('coinBettingArea').style.display = 'flex';
+    $('coinStatus').textContent = 'Твой ход! Выбери ставку и сторону';
 
-  if (data.points) {
-    coinMyPoints = data.points[myId] || 0;
-    const oppId = Object.keys(data.points).find((id) => Number(id) !== myId);
-    coinOppPoints = data.points[oppId] || 0;
-    $('coinMyPoints').textContent = coinMyPoints;
-    $('coinOppPoints').textContent = coinOppPoints;
+    coinSelectedBet = null;
+    coinSelectedSide = null;
+    $('coinConfirmBet').disabled = true;
+    $('coinConfirmBet').textContent = 'Поставить';
+
+    document.querySelectorAll('.coin-bet-btn').forEach((b) => {
+      b.classList.remove('selected');
+      const val = parseInt(b.textContent);
+      b.disabled = val > coinCurrentMaxBet;
+    });
+    document.querySelectorAll('.coin-side-btn').forEach((b) => b.classList.remove('selected'));
+  } else {
+    // I'm waiting for opponent to propose
+    $('coinBettingArea').style.display = 'none';
+    $('coinStatus').textContent = 'Соперник делает ставку...';
   }
-
-  // Update bet buttons based on points
-  document.querySelectorAll('.coin-bet-btn').forEach((b) => {
-    b.classList.remove('selected');
-    const val = parseInt(b.textContent);
-    b.disabled = val > coinMyPoints;
-  });
-  document.querySelectorAll('.coin-side-btn').forEach((b) => b.classList.remove('selected'));
 });
 
 function selectBet(amount) {
-  if (amount > coinMyPoints) return;
+  if (amount > coinCurrentMaxBet) return;
   coinSelectedBet = amount;
   document.querySelectorAll('.coin-bet-btn').forEach((b) => {
     b.classList.toggle('selected', parseInt(b.textContent) === amount);
@@ -543,21 +550,68 @@ function updateConfirmBtn() {
 
 function confirmBet() {
   if (!coinSelectedBet || !coinSelectedSide) return;
-  socket.emit('coin_place_bet', { bet: coinSelectedBet, choice: coinSelectedSide });
+  socket.emit('coin_propose_bet', { amount: coinSelectedBet, choice: coinSelectedSide });
   $('coinBettingArea').style.display = 'none';
-  $('coinStatus').textContent = 'Ставка принята. Ждём соперника...';
+  $('coinStatus').textContent = 'Ставка отправлена. Ждём ответ соперника...';
 }
 
-socket.on('coin_opponent_bet_placed', () => {
-  $('coinStatus').textContent = 'Соперник сделал ставку!';
+// --- Responding to bet ---
+socket.on('coin_bet_proposed', (data) => {
+  $('coinBettingArea').style.display = 'none';
+  coinUpdatePoints(data.points);
+
+  if (data.responderId === myId) {
+    // I need to accept or decline
+    const sideText = data.choice === 'heads' ? 'Орёл' : 'Решка';
+    $('coinRespondArea').style.display = 'flex';
+    $('coinProposalInfo').innerHTML =
+      `<strong>${data.proposerName}</strong> ставит <strong>${data.amount}</strong> на <strong>${sideText}</strong>`;
+    $('coinStatus').textContent = 'Принять ставку или отказаться? (-1 балл)';
+  } else {
+    // I proposed, waiting for response
+    $('coinStatus').textContent = 'Ждём ответ соперника...';
+  }
+});
+
+function coinAcceptBet() {
+  $('coinRespondArea').style.display = 'none';
+  $('coinStatus').textContent = 'Ставка принята! Монетка летит...';
+  socket.emit('coin_respond_bet', { accept: true });
+}
+
+function coinDeclineBet() {
+  $('coinRespondArea').style.display = 'none';
+  $('coinStatus').textContent = 'Отказ от ставки. -1 балл';
+  socket.emit('coin_respond_bet', { accept: false });
+}
+
+// --- Bet declined ---
+socket.on('coin_bet_declined', (data) => {
+  $('coinRespondArea').style.display = 'none';
+  coinUpdatePoints(data.points);
+
+  if (data.declinerId === myId) {
+    $('coinStatus').textContent = 'Ты отказался. -1 балл';
+  } else {
+    $('coinStatus').textContent = 'Соперник отказался от ставки. Он теряет 1 балл';
+  }
+
+  coinRoundLogs.unshift({
+    round: '-',
+    type: 'decline',
+    declinerId: data.declinerId,
+    result: data.declinerId === myId ? '-1' : '+0',
+    cls: data.declinerId === myId ? 'l' : 'w',
+  });
+  renderCoinLog();
 });
 
 // --- Coin Flip Result ---
 socket.on('coin_flip_result', (data) => {
   $('coinStatus').textContent = '';
   $('coinBettingArea').style.display = 'none';
+  $('coinRespondArea').style.display = 'none';
 
-  // Show coin animation
   $('coinFlipArea').style.display = 'flex';
   const coin = $('coin3d');
   coin.className = 'coin-3d';
@@ -573,48 +627,31 @@ socket.on('coin_flip_result', (data) => {
     $('coinResultSide').className = 'coin-result-side ' + (data.coinResult === 'heads' ? 'heads-color' : 'tails-color');
 
     const iWon = data.winnerId === myId;
-    const isDraw = !data.winnerId;
 
-    if (isDraw) {
-      $('coinResultText').textContent = 'Оба выбрали одну сторону!';
-      $('coinResultText').className = 'coin-result-text draw';
-      $('coinResultTransfer').textContent = '0 баллов';
-    } else if (iWon) {
+    if (iWon) {
       $('coinResultText').textContent = 'Ты выиграл!';
       $('coinResultText').className = 'coin-result-text win';
-      $('coinResultTransfer').textContent = `+${data.transferAmount} баллов`;
+      $('coinResultTransfer').textContent = `+${data.betAmount} баллов`;
       $('coinResultTransfer').className = 'coin-result-transfer positive';
     } else {
       $('coinResultText').textContent = 'Ты проиграл';
       $('coinResultText').className = 'coin-result-text lose';
-      $('coinResultTransfer').textContent = `-${data.transferAmount} баллов`;
+      $('coinResultTransfer').textContent = `-${data.betAmount} баллов`;
       $('coinResultTransfer').className = 'coin-result-transfer negative';
     }
 
-    // Update points
-    if (data.points) {
-      coinMyPoints = data.points[myId] || 0;
-      const oppId = Object.keys(data.points).find((id) => Number(id) !== myId);
-      coinOppPoints = data.points[oppId] || 0;
-      $('coinMyPoints').textContent = coinMyPoints;
-      $('coinOppPoints').textContent = coinOppPoints;
-    }
+    coinUpdatePoints(data.points);
 
-    // Log
-    const myChoice = data.choices[myId];
-    const oppId = Object.keys(data.choices).find((id) => Number(id) !== myId);
-    const oppChoice = data.choices[oppId];
-    const logCls = isDraw ? 'd' : (iWon ? 'w' : 'l');
-    const logText = isDraw ? 'НИЧЬЯ' : (iWon ? `+${data.transferAmount}` : `-${data.transferAmount}`);
+    const choiceText = data.proposerChoice === 'heads' ? 'O' : 'P';
+    const resultText = data.coinResult === 'heads' ? 'O' : 'P';
     coinRoundLogs.unshift({
       round: data.round,
-      myChoice,
-      oppChoice,
-      coinResult: data.coinResult,
-      result: logText,
-      cls: logCls,
-      myBet: data.bets[myId],
-      oppBet: data.bets[oppId],
+      type: 'flip',
+      bet: data.betAmount,
+      proposerChoice: choiceText,
+      coinResult: resultText,
+      result: iWon ? `+${data.betAmount}` : `-${data.betAmount}`,
+      cls: iWon ? 'w' : 'l',
     });
     renderCoinLog();
 
@@ -623,16 +660,17 @@ socket.on('coin_flip_result', (data) => {
 
 function renderCoinLog() {
   $('coinRoundLog').innerHTML = coinRoundLogs.slice(0, 10).map((l) => {
-    const mySide = l.myChoice === 'heads' ? 'O' : 'P';
-    const oppSide = l.oppChoice === 'heads' ? 'O' : 'P';
-    const coinSide = l.coinResult === 'heads' ? 'O' : 'P';
+    if (l.type === 'decline') {
+      return `<div class="log-entry">
+        <span>--</span>
+        <span class="log-icons">Отказ от ставки</span>
+        <span class="log-result ${l.cls}">${l.result}</span>
+      </div>`;
+    }
     return `<div class="log-entry">
       <span>R${l.round}</span>
       <span class="log-icons">
-        <span class="coin-log-side">${mySide}(${l.myBet})</span>
-        vs
-        <span class="coin-log-side">${oppSide}(${l.oppBet})</span>
-        = ${coinSide}
+        ${l.proposerChoice}(${l.bet}) = ${l.coinResult}
       </span>
       <span class="log-result ${l.cls}">${l.result}</span>
     </div>`;
@@ -694,13 +732,7 @@ socket.on('coin_opponent_wants_rematch', () => {
 socket.on('coin_rematch_start', (data) => {
   coinRoundLogs = [];
   $('coinRoundLog').innerHTML = '';
-  if (data.points) {
-    coinMyPoints = data.points[myId] || 10;
-    const oppId = Object.keys(data.points).find((id) => Number(id) !== myId);
-    coinOppPoints = data.points[oppId] || 10;
-  }
-  $('coinMyPoints').textContent = coinMyPoints;
-  $('coinOppPoints').textContent = coinOppPoints;
+  coinUpdatePoints(data.points);
   $('btnExit').style.display = '';
   showScreen('screenCoinGame');
   coinShowReadyPhase();

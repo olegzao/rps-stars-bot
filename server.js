@@ -42,12 +42,14 @@ function newCoinRoom(roomId, playerId) {
     id: roomId,
     gameType: 'coin',
     players: {
-      [playerId]: { id: playerId, points: COIN_STARTING_POINTS, bet: null, choice: null, socket: null, ready: false, roundsWon: 0 }
+      [playerId]: { id: playerId, points: COIN_STARTING_POINTS, socket: null, ready: false, roundsWon: 0 }
     },
     round: 0,
-    status: 'waiting',
+    status: 'waiting', // waiting | ready_check | proposing | responding | flipping | finished
     timer: null,
-    coinResult: null,
+    currentBet: null,    // { amount, choice, proposerId }
+    turnOrder: [],       // [id1, id2] — who proposes next
+    turnIndex: 0,
   };
 }
 
@@ -73,11 +75,7 @@ function coinGetPoints(room) {
 
 function coinEnterReadyCheck(room) {
   room.status = 'ready_check';
-  for (const p of Object.values(room.players)) {
-    p.ready = false;
-    p.bet = null;
-    p.choice = null;
-  }
+  for (const p of Object.values(room.players)) p.ready = false;
 
   const playersList = coinGetPlayerIds(room).map((id) => {
     const u = getUser(id);
@@ -88,73 +86,79 @@ function coinEnterReadyCheck(room) {
   coinBroadcast(room, 'coin_ready_check', { readyPlayers: [] });
 }
 
-function coinStartBetting(room) {
-  room.round++;
-  room.status = 'betting';
-  for (const p of Object.values(room.players)) {
-    p.bet = null;
-    p.choice = null;
+function coinCheckGameOver(room) {
+  const ids = coinGetPlayerIds(room);
+  const someoneOut = ids.some((id) => room.players[id].points <= 0);
+  if (someoneOut) {
+    const scores = {};
+    ids.forEach((id) => { scores[id] = room.players[id].roundsWon; });
+    coinBroadcast(room, 'coin_game_over', { scores, points: coinGetPoints(room), reason: 'bankrupt' });
+    endGameDb(room.id);
+    room.status = 'finished';
+    return true;
   }
+  return false;
+}
 
-  coinBroadcast(room, 'coin_betting_start', {
+function coinStartProposing(room) {
+  room.round++;
+  room.status = 'proposing';
+  room.currentBet = null;
+
+  const proposerId = room.turnOrder[room.turnIndex % 2];
+  const maxBet = Math.min(10, ...coinGetPlayerIds(room).map((id) => room.players[id].points));
+
+  coinBroadcast(room, 'coin_propose_turn', {
     round: room.round,
+    proposerId,
+    maxBet,
     points: coinGetPoints(room),
   });
 }
 
 function coinFlip(room) {
   room.status = 'flipping';
-  room.coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
-
-  const ids = coinGetPlayerIds(room);
-  const [p1Id, p2Id] = ids;
-  const p1 = room.players[p1Id], p2 = room.players[p2Id];
+  const coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
+  const bet = room.currentBet;
+  const proposerId = bet.proposerId;
+  const responderId = coinGetOpponentId(room, proposerId);
 
   let winnerId = null, loserId = null;
-
-  if (p1.choice === room.coinResult && p2.choice !== room.coinResult) {
-    winnerId = p1Id; loserId = p2Id;
-  } else if (p2.choice === room.coinResult && p1.choice !== room.coinResult) {
-    winnerId = p2Id; loserId = p1Id;
+  if (bet.choice === coinResult) {
+    winnerId = proposerId;
+    loserId = responderId;
+  } else {
+    winnerId = responderId;
+    loserId = proposerId;
   }
 
-  let transferAmount = 0;
-  if (winnerId && loserId) {
-    const winnerBet = room.players[winnerId].bet;
-    const loserBet = room.players[loserId].bet;
-    transferAmount = Math.min(winnerBet, loserBet, room.players[loserId].points);
-    room.players[winnerId].points += transferAmount;
-    room.players[loserId].points -= transferAmount;
-    room.players[winnerId].roundsWon++;
-  }
+  room.players[winnerId].points += bet.amount;
+  room.players[loserId].points -= bet.amount;
+  room.players[winnerId].roundsWon++;
 
-  addRound(room.id, room.round, p1.choice || 'none', p2.choice || 'none', winnerId);
+  addRound(room.id, room.round, bet.choice, coinResult, winnerId);
 
   coinBroadcast(room, 'coin_flip_result', {
     round: room.round,
-    coinResult: room.coinResult,
-    choices: { [p1Id]: p1.choice, [p2Id]: p2.choice },
-    bets: { [p1Id]: p1.bet, [p2Id]: p2.bet },
+    coinResult,
+    proposerChoice: bet.choice,
+    betAmount: bet.amount,
+    proposerId,
+    responderId,
     winnerId,
     loserId,
-    transferAmount,
     points: coinGetPoints(room),
-    roundsWon: { [p1Id]: p1.roundsWon, [p2Id]: p2.roundsWon },
+    roundsWon: { [proposerId]: room.players[proposerId].roundsWon, [responderId]: room.players[responderId].roundsWon },
   });
 
-  const someoneOut = ids.some((id) => room.players[id].points <= 0);
+  // Switch turn
+  room.turnIndex++;
 
-  if (someoneOut) {
-    setTimeout(() => {
-      const scores = {};
-      ids.forEach((id) => { scores[id] = room.players[id].roundsWon; });
-      coinBroadcast(room, 'coin_game_over', { scores, points: coinGetPoints(room), reason: 'bankrupt' });
-      endGameDb(room.id);
-      room.status = 'finished';
-    }, 3000);
-  } else {
-    setTimeout(() => coinEnterReadyCheck(room), 3000);
-  }
+  setTimeout(() => {
+    if (!coinCheckGameOver(room)) {
+      coinStartProposing(room);
+    }
+  }, 3500);
 }
 
 function newRoom(roomId, playerId) {
@@ -567,37 +571,79 @@ io.on('connection', (socket) => {
 
     if (ids.length === 2 && ids.every((id) => room.players[id].ready)) {
       for (const p of Object.values(room.players)) p.ready = false;
-      setTimeout(() => coinStartBetting(room), 500);
+      // Set turn order: first player who joined proposes first
+      room.turnOrder = ids;
+      room.turnIndex = 0;
+      setTimeout(() => coinStartProposing(room), 500);
     }
   });
 
-  socket.on('coin_place_bet', (data) => {
+  // Proposer sends bet amount + choice (heads/tails)
+  socket.on('coin_propose_bet', (data) => {
     const pid = socket._playerId;
     const roomId = socket._currentRoom;
     if (!pid || !roomId) return;
     const room = coinRooms.get(roomId);
-    if (!room || room.status !== 'betting') return;
+    if (!room || room.status !== 'proposing') return;
 
-    const player = room.players[pid];
-    if (!player || player.bet !== null) return;
+    // Only the current proposer can propose
+    const proposerId = room.turnOrder[room.turnIndex % 2];
+    if (pid !== proposerId) return;
 
-    const bet = parseInt(data.bet, 10);
+    const amount = parseInt(data.amount, 10);
     const choice = data.choice;
+    const maxBet = Math.min(10, ...coinGetPlayerIds(room).map((id) => room.players[id].points));
 
-    if (!bet || bet < 1 || bet > 5 || bet > player.points) return;
+    if (!amount || amount < 1 || amount > maxBet) return;
     if (choice !== 'heads' && choice !== 'tails') return;
 
-    player.bet = bet;
-    player.choice = choice;
+    room.currentBet = { amount, choice, proposerId: pid };
+    room.status = 'responding';
 
-    const oppId = coinGetOpponentId(room, pid);
-    if (oppId && room.players[oppId]?.socket) {
-      room.players[oppId].socket.emit('coin_opponent_bet_placed');
-    }
+    const responderId = coinGetOpponentId(room, pid);
+    const proposerUser = getUser(pid);
 
-    const ids = coinGetPlayerIds(room);
-    if (ids.every((id) => room.players[id].bet !== null)) {
-      setTimeout(() => coinFlip(room), 500);
+    coinBroadcast(room, 'coin_bet_proposed', {
+      proposerId: pid,
+      proposerName: proposerUser?.first_name || proposerUser?.username || 'Игрок',
+      responderId,
+      amount,
+      choice,
+      points: coinGetPoints(room),
+    });
+  });
+
+  // Responder accepts or declines
+  socket.on('coin_respond_bet', (data) => {
+    const pid = socket._playerId;
+    const roomId = socket._currentRoom;
+    if (!pid || !roomId) return;
+    const room = coinRooms.get(roomId);
+    if (!room || room.status !== 'responding' || !room.currentBet) return;
+
+    // Only the responder can respond
+    const responderId = coinGetOpponentId(room, room.currentBet.proposerId);
+    if (pid !== responderId) return;
+
+    if (data.accept) {
+      // Accepted — flip the coin
+      coinFlip(room);
+    } else {
+      // Declined — responder loses 1 point
+      room.players[pid].points -= 1;
+
+      coinBroadcast(room, 'coin_bet_declined', {
+        declinerId: pid,
+        points: coinGetPoints(room),
+      });
+
+      room.turnIndex++;
+
+      setTimeout(() => {
+        if (!coinCheckGameOver(room)) {
+          coinStartProposing(room);
+        }
+      }, 2000);
     }
   });
 
@@ -630,10 +676,10 @@ io.on('connection', (socket) => {
     const ids = coinGetPlayerIds(room);
     if (ids.every((id) => room.players[id]?.ready)) {
       room.round = 0;
+      room.turnIndex = 0;
+      room.currentBet = null;
       ids.forEach((id) => {
         room.players[id].ready = false;
-        room.players[id].choice = null;
-        room.players[id].bet = null;
         room.players[id].points = COIN_STARTING_POINTS;
         room.players[id].roundsWon = 0;
       });
