@@ -240,6 +240,14 @@ body {
   gap: 12px;
 }
 
+.opponent-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
 .round-info {
   font-size: 13px;
   color: var(--text2);

@@ -119,6 +119,8 @@ socket.on('room_full', () => {
 socket.on('game_ready', (data) => {
   const opp = data.players.find((p) => p.id !== myId);
   opponentInfo = opp;
+  const oppName = opp?.firstName || opp?.username || 'Соперник';
+  $('opponentName').textContent = `vs ${oppName}`;
   $('btnExit').style.display = '';
   showScreen('screenGame');
 });
